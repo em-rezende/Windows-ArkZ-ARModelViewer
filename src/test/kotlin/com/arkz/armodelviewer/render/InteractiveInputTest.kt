@@ -105,19 +105,28 @@ class InteractiveInputTest {
     }
 
     @Test
-    fun `arrastar para cima traz o modelo para a frente na figura`() {
-        // O sentido deste teste foi corrigido pelo **teste em campo** (decisão 21). Com o sinal
-        // da primeira versão, arrastar para cima dava +Y — e o usuário relatou justamente o
-        // oposto: o modelo ia "para trás". Então +Y é "para trás" e −Y é "para a frente", e
-        // arrastar para cima tem de dar −Y.
-        val offset = InteractiveInput.panOffset(
+    fun `o modelo acompanha o ponteiro no arrasto vertical`() {
+        // Arrasto vertical no PLANO da figura: o eixo é o Z do marcador (a "altura NA imagem"),
+        // e o modelo anda no mesmo sentido do ponteiro — arrastar para baixo leva o modelo para
+        // baixo na imagem. O Y do marcador é a **normal** e não entra no arrasto: puxar o modelo
+        // nunca o tira do papel (decisão 34).
+        val paraBaixo = InteractiveInput.panOffset(
+            current = Vec3.ZERO,
+            dxPixels = 0f,
+            dyPixels = 100f, // arrasto para baixo
+            sizeMeters = 0.5f,
+        )
+        val paraCima = InteractiveInput.panOffset(
             current = Vec3.ZERO,
             dxPixels = 0f,
             dyPixels = -100f, // arrasto para cima
             sizeMeters = 0.5f,
         )
 
-        assertTrue(offset.y < 0f, "arrastar para cima traz o modelo para a frente: ${offset.y}")
+        assertTrue(paraBaixo.z > 0f, "arrastar para baixo leva o modelo para baixo na imagem: ${paraBaixo.z}")
+        assertTrue(paraCima.z < 0f, "arrastar para cima leva o modelo para o alto da imagem: ${paraCima.z}")
+        assertEquals(0f, paraBaixo.y, "o arrasto não mexe na normal: o modelo não sai do papel")
+        assertEquals(0f, paraCima.y, "o arrasto não mexe na normal: o modelo não sai do papel")
     }
 
     @Test

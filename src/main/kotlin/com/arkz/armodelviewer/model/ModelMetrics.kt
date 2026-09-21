@@ -49,26 +49,34 @@ class ModelMetrics(
     /**
      * Deslocamento do nó para ancorar o modelo no marcador.
      *
-     * **Atenção ao referencial do marcador**: o plano da figura é **XY** e a **normal é o
-     * eixo Z** (apontando para fora do plano, na direção de quem olha). É a convenção que o
-     * app Android documenta e que a prática confirmou: com a normal em Z, `Elevação Z`
-     * afasta o modelo do plano; supondo-a em Y, o controle empurrava o modelo **de través**
-     * sobre a figura — um defeito que só aparece quando alguém mexe no slider.
+     * **O referencial do marcador é o do ARCore** — e é o que o `solvePnP` produz a partir das
+     * quatro quinas montadas em `MarkerDetector.markerObjectPointsMat` (nelas o Y é **zero**):
+     * **X = largura**, **Y = a NORMAL** (sai do papel, na direção de quem olha) e **Z = altura
+     * NA imagem**. É o mesmo referencial dos nomes `extentX`/`extentZ` do `AugmentedImage`,
+     * mantido de propósito para que a conta do app Android valha sem alteração.
+     *
+     * Com ele, o "para cima" do arquivo (**+Y**, a convenção do glTF) **já é a normal do
+     * marcador** — e é por isso que não existe rotação de apoio: o modelo carrega de pé.
      *
      * Logo:
      *  - `x = -center.x * scale` → centraliza na largura da figura;
-     *  - `y = +center.z * scale` → centraliza na altura NA imagem (o "para cima" do modelo
-     *    vira a normal, então a profundidade do arquivo cai no eixo Y do marcador);
-     *  - `z = -(center.y - halfExtent.y) * scale + elevationMeters` → apoia a **base** do
-     *    modelo no plano da figura e soma a **elevação** (o único eixo em que o modelo sai
-     *    do plano).
+     *  - `y = -(center.y - halfExtent.y) * scale + elevationMeters` → apoia a **base** do
+     *    modelo no plano (este é o eixo da normal) e soma a **elevação**, o único deslocamento
+     *    que tira o modelo do plano;
+     *  - `z = -center.z * scale` → centraliza na altura NA imagem.
      *
      * Tudo multiplicado pela escala atual, de modo que o alinhamento acompanha o slider de
      * tamanho e a escala automática.
+     *
+     * > **Histórico (decisão 34 do roadmap).** A primeira versão desta função trocou Y e Z,
+     * > acreditando que o plano do marcador fosse XY. O defeito apareceu com o marcador na mão:
+     * > girando a folha pela normal, o "para cima" do modelo (que caía dentro do plano) girava
+     * > em torno do eixo errado — o modelo deitava. O referencial correto é o de cima, e
+     * > `ModelPlacementTest` gira a folha e cobra que o modelo continue de pé.
      */
     fun anchorPosition(scale: Float, elevationMeters: Float): Vec3 = Vec3(
         x = -center.x * scale,
-        y = center.z * scale,
-        z = -(center.y - halfExtent.y) * scale + elevationMeters,
+        y = -(center.y - halfExtent.y) * scale + elevationMeters,
+        z = -center.z * scale,
     )
 }

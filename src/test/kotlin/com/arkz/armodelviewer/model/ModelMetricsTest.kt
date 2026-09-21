@@ -57,16 +57,19 @@ class ModelMetricsTest {
     }
 
     @Test
-    fun `anchorPosition centraliza em X e na altura da imagem e apoia a base na normal`() {
+    fun `anchorPosition centraliza na largura, apoia a base na normal e centra na altura da imagem`() {
         val scale = metrics.normalization * 0.2f // 0,05 × 20 cm
 
         val position = metrics.anchorPosition(scale = scale, elevationMeters = 0f)
 
         // As comparações usam tolerância: a escala é um produto de `Float`
         // (0,05f × 0,2f), então o resultado tem um resíduo de ponto flutuante.
-        assertEquals(-0.01f, position.x, TOLERANCE, "x = -centro.x × escala")
-        assertEquals(0.03f, position.y, TOLERANCE, "y centraliza a profundidade do arquivo")
-        assertEquals(0.03f, position.z, TOLERANCE, "z apoia a base do modelo no plano da figura")
+        //
+        // Referencial do marcador (o do ARCore, e o que o `solvePnP` produz): X = largura,
+        // **Y = normal** (sai do papel) e Z = altura NA imagem — decisão 34.
+        assertEquals(-0.01f, position.x, TOLERANCE, "x = -centro.x × escala (largura)")
+        assertEquals(0.03f, position.y, TOLERANCE, "y apoia a base no plano, no eixo da normal")
+        assertEquals(-0.03f, position.z, TOLERANCE, "z centraliza a profundidade do arquivo na altura da imagem")
     }
 
     @Test
@@ -74,15 +77,16 @@ class ModelMetricsTest {
         val scale = 0.01f
         val base = metrics.anchorPosition(scale = scale, elevationMeters = 0f)
 
-        // +50 cm afasta o modelo do plano do marcador: o plano da figura é XY, e a normal
-        // (o eixo Z) é o único eixo em que o modelo sai dele.
+        // +50 cm afasta o modelo do plano do marcador: a normal é o **Y** do referencial do
+        // marcador (X = largura, Y = normal, Z = altura NA imagem — decisão 34), e é o único
+        // eixo em que o modelo sai do papel.
         val elevated = metrics.anchorPosition(scale = scale, elevationMeters = 0.5f)
         assertEquals(base.x, elevated.x)
-        assertEquals(base.y, elevated.y)
-        assertEquals(base.z + 0.5f, elevated.z, 0.0001f)
+        assertEquals(base.z, elevated.z)
+        assertEquals(base.y + 0.5f, elevated.y, 0.0001f)
 
         val lowered = metrics.anchorPosition(scale = scale, elevationMeters = -0.5f)
-        assertEquals(base.z - 0.5f, lowered.z, 0.0001f)
+        assertEquals(base.y - 0.5f, lowered.y, 0.0001f)
     }
 
     @Test
@@ -94,6 +98,6 @@ class ModelMetricsTest {
 
         assertEquals(-0.01f, small.x)
         assertEquals(-1f, big.x)
-        assertTrue(big.z > small.z, "um modelo maior exige deslocamento maior para apoiar a base")
+        assertTrue(big.y > small.y, "um modelo maior exige deslocamento maior para apoiar a base")
     }
 }

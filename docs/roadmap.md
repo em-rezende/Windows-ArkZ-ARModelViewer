@@ -119,7 +119,8 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     igual nos oito —, e não uma chave nova em um idioma só. Mesmo critério para o aviso
     sonoro da captura: o Windows não tem um som padrão de obturador, então o aplicativo usa
     o aviso sonoro do sistema, e o código diz por quê.
-15. **O referencial do marcador é: plano em XY e normal em Z.** A primeira versão do port
+15. ~~**O referencial do marcador é: plano em XY e normal em Z.**~~ **ERRADA — corrigida na
+    decisão 34: o plano é XZ e a normal é Y.** A primeira versão do port
     supôs o referencial de imagem do ARCore (normal no Y) e o defeito só apareceu na
     primeira sessão de uso com hardware, em dois sintomas que o usuário descreveu com
     precisão: os modelos chegavam **deitados** sobre a figura e o controle **Elevação Z**
@@ -424,3 +425,37 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     no pt-BR: os textos herdados do Android falavam de `adb logcat` e da pinça de tela. Os
     `help_body` corrigidos ficaram **também** em `tools/i18n-overrides/`, para o pipeline de
     idiomas continuar idempotente (a Ajuda do Android mencionava o Logcat em seis idiomas).
+34. **O referencial do marcador estava invertido — e o defeito era meu.** O usuário relatou
+    ("quando giro o marcador pela sua normal, o modelo gira no eixo errado") e pediu
+    verificação. A causa não estava no gesto nem no `solvePnP`: estava na **suposição que eu
+    havia gravado na decisão 15**, de que o plano do marcador fosse XY. Não é. As quatro
+    quinas que o detector entrega ao `solvePnP` (`MarkerDetector.markerObjectPointsMat`) têm
+    **Y = 0** — o marcador é plano nesse eixo —, e o resultado é o referencial do ARCore:
+    **X = largura, Y = NORMAL (sai do papel, na direção de quem olha) e Z = altura NA imagem**.
+    Os nomes `extentX`/`extentZ` do `AugmentedImage` sempre disseram isso, e o KDoc do
+    `Pose` também.
+    Com o referencial invertido, a "rotação de apoio" de 90° em X jogava o "para cima" do
+    modelo (o +Y do glTF) **para dentro do plano** (no Z, altura na imagem): o modelo ficava
+    deitado sobre a figura e, ao girar a folha impressa pela normal — que é o Y verdadeiro —,
+    girava em torno do eixo errado. É exatamente o que o usuário descreveu. O que foi
+    corrigido:
+    (a) `ModelMetrics.anchorPosition`: `y = -(center.y - halfExtent.y) * scale + elevação`
+    (apoia a base **na normal**) e `z = -center.z * scale` (centraliza na altura da imagem);
+    (b) **a "rotação de apoio" foi removida** de `ModelPlacement`: o +Y do arquivo **já é** a
+    normal, então o modelo carrega de pé e o zero dos sliders é "em pé";
+    (c) o **arrasto** passou a andar no plano de verdade — `x` e `z`, com o **`y` sempre em
+    zero** (a normal): arrastar não tira mais o modelo do papel (`InteractiveInput.panOffset`
+    e `SceneComposer.setOffsetMeters`);
+    (d) **um teste que reproduz o relato**: `ModelPlacementTest` gira o marcador em torno da
+    normal (12 posições, de 30° em 30°) e cobra que o "para cima" do modelo continue sobre a
+    normal — ele **falhava** antes da correção (o valor caía no plano) e passa agora. Os
+    testes que eu havia calibrado pelo referencial errado foram reescritos
+    (`ModelPlacementTest`, `ModelMetricsTest`, `InteractiveInputTest`, `SceneComposerTest`), e
+    a decisão 15 ficou marcada como ERRADA;
+    (e) a documentação foi corrigida em `docs/rendering.md` (a nota que afirmava "plano em
+    XY") e nos KDocs de `ModelMetrics` e `InteractiveInput`.
+    **O que fica para o campo:** o arrasto **vertical** mudou de eixo (era a normal, agora é o
+    plano), então a sensação que o teste em campo havia aprovado na decisão 21 não vale mais —
+    agora o modelo **acompanha o ponteiro**. É a única coisa que pede reconferência no
+    notebook, junto com a conferência de que o modelo **gira em torno de si** quando a folha
+    gira.

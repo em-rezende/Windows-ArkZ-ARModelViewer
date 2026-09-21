@@ -8,6 +8,26 @@ Antes da 1.0.0 não houve versão pública: o aplicativo foi construído por eta
 (descritas em [`docs/roadmap.md`](docs/roadmap.md)) e conferido em uso real antes de
 ser publicado.
 
+## [1.0.1] — 2026-09-21
+
+Correção de um defeito de **referencial** na ancoragem do modelo, relatado em uso real.
+
+### Corrigido
+
+- **O modelo girava em torno do eixo errado quando o marcador era girado pela sua normal.**
+  O referencial do marcador é o do ARCore — **X = largura, Y = NORMAL, Z = altura NA imagem** —
+  e o código supunha o plano em XY: a "rotação de apoio" jogava o "para cima" do modelo
+  (o +Y do glTF) para dentro do plano, deixando-o deitado sobre a figura. A rotação de apoio
+  foi removida, a ancoragem passou a apoiar a base **na normal** e o arrasto passou a andar no
+  plano (X e Z, com a normal sempre intocada): arrastar não tira mais o modelo do papel.
+- **Um teste que reproduz o relato**: `ModelPlacementTest` gira o marcador em torno da normal,
+  de 30° em 30°, e cobra que o "para cima" do modelo continue sobre a normal — ele falhava
+  antes da correção.
+- Os testes que codificavam o referencial invertido foram reescritos e a documentação
+  (`docs/rendering.md`, mais os KDocs de `ModelMetrics` e `InteractiveInput`), corrigida.
+  **200 testes.** O sentido do arrasto vertical é o único comportamento que pede
+  reconferência em campo (veja a decisão 34 do roadmap).
+
 ## [1.0.0] — 2026-09-21
 
 Primeira versão pública: o fluxo completo de realidade aumentada no Windows —

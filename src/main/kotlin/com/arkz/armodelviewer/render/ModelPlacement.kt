@@ -90,30 +90,27 @@ object ModelPlacement {
             z = anchor.z + offsetMeters.z,
         )
 
-        // Local: translação (ancoragem + arrasto) ∘ rotação do usuário ∘ APOIO ∘ escala.
+        // Local: translação (ancoragem + arrasto) · rotação do usuário · escala.
         //
-        // A rotação de apoio é o que põe o modelo **em pé sobre a figura**: os modelos
-        // glTF/GLB (e a maioria dos exportados de CAD) têm o "para cima" no +Y, e o plano
-        // do marcador é XY — sem ela, o "para cima" do modelo cai DENTRO do plano e o modelo
-        // aparece deitado sobre a figura (era preciso girar 90° em X à mão em cada modelo).
-        // Com ela, o "para cima" do modelo vira a normal do marcador, e o zero dos sliders
-        // passa a ser "em pé".
+        // Não há rotação de apoio — e essa é a correção da decisão 34: o "para cima" do arquivo
+        // (o +Y do glTF) **é** a normal do marcador no referencial do ARCore, que é o que o
+        // `solvePnP` produz (veja `MarkerDetector.markerObjectPointsMat`, em que o Y é **zero**
+        // nas quatro quinas). O modelo já carrega de pé sobre a figura, o zero dos sliders é
+        // "em pé" e girar a folha impressa gira o modelo em torno de si mesmo, sem deitá-lo.
+        //
+        // A versão anterior girava 90° em X aqui, supondo o plano do marcador em XY: o "para
+        // cima" do modelo caía DENTRO do plano (no eixo Z, altura na imagem) e, ao girar a folha
+        // pela normal, o modelo girava em torno do eixo errado — o defeito relatado em campo.
         val local = multiply(
             translation(placement),
-            multiply(
-                eulerRotation(rotationDegrees),
-                multiply(standingUpright(), uniformScale(scale)),
-            ),
+            multiply(eulerRotation(rotationDegrees), uniformScale(scale)),
         )
 
         return multiply(markerPoseToMatrix(markerPose), local)
     }
-
-    /**
-     * Rotação que em pé um modelo cujo "para cima" é o +Y do arquivo, deixando esse eixo
-     * sobre a **normal** do marcador (o eixo Z do plano XY).
-     */
-    private fun standingUpright(): FloatArray = eulerRotation(Vec3(90f, 0f, 0f))
+    // O apoio de 90° saiu na decisão 34: o "para cima" do arquivo (+Y) **é** a normal do
+    // marcador, então o modelo carrega de pé e não há rotação a aplicar (veja o comentário
+    // do `local` acima).
 
     /**
      * Rotação a partir dos ângulos do painel.
