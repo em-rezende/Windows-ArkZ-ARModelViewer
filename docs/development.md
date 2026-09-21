@@ -142,7 +142,15 @@ gh release create v1.0.0 --title "1.0.0" --notes-file CHANGELOG.md
 
 > O pacote portátil **não** entra no repositório (o `.gitignore` exclui `build/`, `dist/`,
 > `*.zip` e `*.exe`). Para anexá-lo a uma release:
-> `gh release upload v1.0.0 "dist\ArkZ-ARModelViewer-1.0.0-portatil.zip"`.
+>
+> ```powershell
+> Compress-Archive -Path "build\compose\binaries\main\app\ArkZ ARModelViewer" `
+>                  -DestinationPath "dist\ArkZ-ARModelViewer-1.0.0-portatil.zip"
+> gh release upload v1.0.0 "dist\ArkZ-ARModelViewer-1.0.0-portatil.zip"
+> ```
+>
+> São cerca de **250 MB** compactados: vale mais como conveniência (o usuário final não
+> instala JDK) do que como obrigação da release.
 
 ## Onde o app grava arquivos
 
