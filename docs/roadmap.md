@@ -119,8 +119,9 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     igual nos oito —, e não uma chave nova em um idioma só. Mesmo critério para o aviso
     sonoro da captura: o Windows não tem um som padrão de obturador, então o aplicativo usa
     o aviso sonoro do sistema, e o código diz por quê.
-15. ~~**O referencial do marcador é: plano em XY e normal em Z.**~~ **ERRADA — corrigida na
-    decisão 34: o plano é XZ e a normal é Y.** A primeira versão do port
+15. **O referencial do marcador é: plano em XY e normal em Z.** (É a convenção **em vigor**, a
+    que o teste em campo aprovou; a análise da decisão 34 mostra por que ela é questionável — o
+    `solvePnP` devolve a normal no Y —, e a correção ficou **adiada** lá.) A primeira versão do port
     supôs o referencial de imagem do ARCore (normal no Y) e o defeito só apareceu na
     primeira sessão de uso com hardware, em dois sintomas que o usuário descreveu com
     precisão: os modelos chegavam **deitados** sobre a figura e o controle **Elevação Z**
