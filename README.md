@@ -26,7 +26,7 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 > Idioma, Ajuda, Sair), os **ajustes em tempo real** num diálogo arrastável (com o botão
 > Redefinir), a **escala automática**, o **gerenciamento de marcador**, o **modo tela cheia**
 > e o **zoom/arrasto** por roda, `Ctrl`+roda, teclado, botões `−`/`+`, pinça de touchpad e
-> arrasto com o mouse. **200 testes unitários verdes**, três deles conferindo os **pixels** de
+> arrasto com o mouse. **201 testes unitários verdes**, três deles conferindo os **pixels** de
 > quadros desenhados na GPU. O pacote portátil e o diagnóstico de modelo por linha de comando
 > estão em [`docs/development.md`](docs/development.md); o roadmap completo, com critérios de
 > aceite por etapa, em [`docs/roadmap.md`](docs/roadmap.md); a detecção em

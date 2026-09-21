@@ -419,4 +419,29 @@ class SceneComposerTest {
             composer.close()
         }
     }
+
+    @Test
+    fun `o modelo carrega com a rotacao inicial de 90 graus em X`() {
+        // Os arquivos de CAD/SketchUp têm o **Z para cima**: com a rotação inicial em zero o
+        // modelo aparecia DEITADO sobre a figura, e o usuário tinha de girar o cursor X à mão
+        // em cada modelo carregado. O valor inicial é o mesmo do app Android para esses
+        // arquivos, e o "Redefinir" volta para ele (veja
+        // [RenderScene.DEFAULT_ROTATION_DEGREES]).
+        val composer = SceneComposer(rendererFactory = { FakeRenderer() }, onLog = {})
+
+        try {
+            assertEquals(
+                Vec3(90f, 0f, 0f),
+                composer.rotationDegrees.value,
+                "o cursor de rotação deve abrir em 90° no X",
+            )
+            assertEquals(
+                RenderScene.DEFAULT_ROTATION_DEGREES,
+                composer.rotationDegrees.value,
+                "e o valor inicial é o mesmo a que o Redefinir volta",
+            )
+        } finally {
+            composer.close()
+        }
+    }
 }

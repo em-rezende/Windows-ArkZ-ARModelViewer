@@ -421,7 +421,7 @@ fun ArSceneSection(
 
     /** Volta todos os ajustes ao padrão (o "Reiniciar" e o "Redefinir configurações"). */
     fun resetSettings() {
-        composer.setRotation(Vec3.ZERO)
+        composer.setRotation(RenderScene.DEFAULT_ROTATION_DEGREES)
         composer.setSizeMeters(RenderScene.DEFAULT_SIZE_METERS)
         composer.setElevationMeters(0f)
         composer.setOffsetMeters(Vec3.ZERO)

@@ -113,7 +113,7 @@ class SceneComposer(
     // desenho leem e escrevem no MESMO lugar (sem dois estados para manter em sincronia —
     // o defeito clássico em que o slider mostra um valor e a cena usa outro).
     private val _sizeMeters = MutableStateFlow(RenderScene.DEFAULT_SIZE_METERS)
-    private val _rotationDegrees = MutableStateFlow(Vec3.ZERO)
+    private val _rotationDegrees = MutableStateFlow(RenderScene.DEFAULT_ROTATION_DEGREES)
     private val _elevationMeters = MutableStateFlow(0f)
     private val _offsetMeters = MutableStateFlow(Vec3.ZERO)
 

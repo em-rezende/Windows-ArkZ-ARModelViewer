@@ -8,6 +8,22 @@ Antes da 1.0.0 não houve versão pública: o aplicativo foi construído por eta
 (descritas em [`docs/roadmap.md`](docs/roadmap.md)) e conferido em uso real antes de
 ser publicado.
 
+## [1.0.5] — 2026-09-21
+
+**Etapa 1 (de duas) da correção do posicionamento do modelo.**
+
+- **O modelo passa a carregar de pé: a rotação inicial é 90° em X.** Os arquivos desta família
+  (CAD/SketchUp, e os convertidos pelo Assimp de `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para
+  cima**; com a rotação inicial em zero o modelo aparecia **deitado** sobre a figura e o usuário
+  tinha de girar o cursor X à mão **em cada modelo carregado**. Agora
+  `RenderScene.DEFAULT_ROTATION_DEGREES` é esse valor — o cursor de **Rotação X** abre em 90° e
+  o **Redefinir** volta para lá. É o **mesmo número** que se usa no app Android para os mesmos
+  arquivos, e o usuário continua livre para ajustar X/Y/Z a partir dele.
+- **201 testes**, com um teste cobrindo o valor inicial e a volta do "Redefinir".
+- **Em aberto (etapa 2, a pedido):** o **arrasto vertical** ainda anda na **normal** do marcador
+  — o modelo sobe e desce saindo do papel. Ele deve andar no plano da figura, como já acontece
+  no eixo X.
+
 ## [1.0.4] — 2026-09-21
 
 - **A matemática de ancoragem passou a ser, linha por linha, a do app Android**

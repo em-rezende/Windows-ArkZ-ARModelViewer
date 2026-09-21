@@ -470,3 +470,15 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     **O que fica como característica, e não como defeito:** o modelo carrega na orientação do
     arquivo, então um arquivo com outro eixo para cima pede o cursor **Rotação X** em 90° —
     exatamente como no Android, e é o mesmo número nos dois aplicativos.
+35. **A rotação inicial do modelo é 90° em X — e agora está no código, não no usuário.** Os
+    arquivos desta família (CAD/SketchUp, e tudo o que o Assimp converte de
+    `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para cima**: com a rotação inicial em zero o modelo
+    carregava **deitado** sobre a figura, e o usuário tinha de girar o cursor X em 90° à mão
+    **em cada modelo carregado**. Como é o mesmo número no app Android, não se trata de defeito
+    desta versão — era um **padrão que faltava**. `RenderScene.DEFAULT_ROTATION_DEGREES` passa a
+    ser esse valor: o cursor de Rotação X abre em **90°** e o "Redefinir" volta para lá, e o
+    usuário continua livre para ajustar X, Y e Z a partir dele. Um teste cobra o valor inicial.
+    **Segunda etapa, ainda aberta (a pedido do usuário, para conferir uma de cada vez):** o
+    **arrasto vertical** — hoje o movimento do mouse no eixo Y mexe a **normal** do marcador
+    (o modelo sobe e desce, saindo do papel); o pedido é que ele ande no plano da figura, como
+    já acontece com o eixo X.

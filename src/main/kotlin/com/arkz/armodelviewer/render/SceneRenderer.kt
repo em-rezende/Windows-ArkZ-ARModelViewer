@@ -163,6 +163,20 @@ class RenderScene(
         const val DEFAULT_SIZE_METERS = 0.2f
 
         /**
+         * Rotação com que o modelo é ancorado, em graus, nos eixos do marcador.
+         *
+         * **+90° em X**, e não zero: os arquivos desta família (CAD/SketchUp, e tudo o que o
+         * Assimp converte de `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para cima**, e sem esta
+         * rotação o modelo carrega **deitado** sobre a figura — obrigando a girar o cursor X à
+         * mão em cada modelo carregado. É o **mesmo número** que se usa no app Android para os
+         * mesmos arquivos.
+         *
+         * É só o valor **inicial** (o que o cursor mostra ao abrir e para onde o "Redefinir"
+         * volta): o usuário continua livre para ajustar X, Y e Z a partir dele.
+         */
+        val DEFAULT_ROTATION_DEGREES: Vec3 = Vec3(90f, 0f, 0f)
+
+        /**
          * Faixa do tamanho do modelo, em metros — a mesma do app Android
          * (`MIN_MODEL_SIZE_METERS` / `MAX_MODEL_SIZE_METERS`): de uma miniatura de 2 cm a
          * um móvel de 2 m em escala real.
