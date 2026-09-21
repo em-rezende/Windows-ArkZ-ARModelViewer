@@ -34,14 +34,10 @@ import kotlin.test.assertTrue
  */
 class ModelPlacementTest {
 
-    /**
-     * Modelo em **unidades do arquivo**, na convenção dos exportadores de CAD/SketchUp:
-     * 20 unidades de largura (X), 10 de profundidade (Y) e 20 de **altura (Z)** — o "para cima"
-     * do arquivo é o Z, e é ele que o `ModelPlacement` leva para a normal do marcador.
-     */
+    /** Modelo em milímetros, como os exportados por CAD: 20 unidades = 20 mm. */
     private val metrics = ModelMetrics(
-        center = Vec3(0f, 0f, 10f),
-        halfExtent = Vec3(10f, 5f, 10f),
+        center = Vec3(0f, 10f, 0f),
+        halfExtent = Vec3(10f, 10f, 5f),
     )
 
     private val identityPose = Pose(
@@ -72,7 +68,7 @@ class ModelPlacementTest {
         // normal do marcador — o Y do referencial do ARCore, que é o que o `solvePnP` produz
         // (decisão 34). Não existe rotação de apoio: ela existia enquanto o código supunha o
         // plano do marcador em XY, e o efeito era o modelo deitar sobre a figura.
-        val top = ModelPlacement.apply(matrix, Vec3(0f, 0f, 20f))
+        val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
         assertEquals(0f, top.x, 1e-5f, "o topo fica no centro da largura")
         assertEquals(0.2f, top.y, 1e-5f, "o topo do modelo sobe pela normal")
         assertEquals(0f, top.z, 1e-5f, "e não anda na altura da imagem")
@@ -83,11 +79,11 @@ class ModelPlacementTest {
         assertEquals(0.1f, center.y, 1e-5f, "metade da altura acima do plano")
         assertEquals(0f, center.z, 1e-5f, "centrado na altura da imagem")
 
-        // Um canto da BASE (z = 0 no arquivo) fica exatamente no plano da figura.
-        val base = ModelPlacement.apply(matrix, Vec3(-10f, -5f, 0f))
+        // Um canto da BASE (y = 0 no arquivo) fica exatamente no plano da figura.
+        val base = ModelPlacement.apply(matrix, Vec3(-10f, 0f, -5f))
         assertEquals(-0.1f, base.x, 1e-5f)
         assertEquals(0f, base.y, 1e-5f, "a base apoia no plano da figura (o eixo da normal)")
-        assertEquals(0.05f, base.z, 1e-5f)
+        assertEquals(-0.05f, base.z, 1e-5f)
     }
 
     @Test
@@ -138,7 +134,7 @@ class ModelPlacementTest {
         assertEquals(center.y, moved.y, 1e-5f, "o arrasto é no plano: a normal não se mexe")
 
         // E a base continua apoiada no plano: o arrasto não levanta nem afunda o modelo.
-        val base = ModelPlacement.apply(dragged, Vec3(-10f, -5f, 0f))
+        val base = ModelPlacement.apply(dragged, Vec3(-10f, 0f, -5f))
         assertEquals(0f, base.y, 1e-5f)
     }
 
@@ -153,8 +149,8 @@ class ModelPlacementTest {
             elevationMeters = 0f,
         )
 
-        val topUpright = ModelPlacement.apply(upright, Vec3(0f, 0f, 20f))
-        val topLaidDown = ModelPlacement.apply(laidDown, Vec3(0f, 0f, 20f))
+        val topUpright = ModelPlacement.apply(upright, Vec3(0f, 20f, 0f))
+        val topLaidDown = ModelPlacement.apply(laidDown, Vec3(0f, 20f, 0f))
 
         // O X do slider gira no **X do marcador** (a largura da figura): o 90° deita o modelo
         // na altura da imagem, e o topo deixa a normal — é o par de eixos que o usuário vê.
@@ -240,9 +236,9 @@ class ModelPlacementTest {
                 elevationMeters = 0f,
             )
 
-            // Direção do "para cima" do arquivo (+Z, a altura) depois de todo o empilhamento.
+            // Direção do "para cima" do arquivo (+Y) depois de todo o empilhamento.
             val base = ModelPlacement.apply(matrix, Vec3(0f, 0f, 0f))
-            val top = ModelPlacement.apply(matrix, Vec3(0f, 0f, 20f))
+            val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
             val up = Vec3(top.x - base.x, top.y - base.y, top.z - base.z)
 
             // O "para cima" continua sendo a normal em qualquer giro da folha: o modelo gira em

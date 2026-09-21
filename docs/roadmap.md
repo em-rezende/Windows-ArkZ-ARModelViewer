@@ -119,9 +119,9 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     igual nos oito —, e não uma chave nova em um idioma só. Mesmo critério para o aviso
     sonoro da captura: o Windows não tem um som padrão de obturador, então o aplicativo usa
     o aviso sonoro do sistema, e o código diz por quê.
-15. **O referencial do marcador é: plano em XY e normal em Z.** (É a convenção **em vigor**, a
-    que o teste em campo aprovou; a análise da decisão 34 mostra por que ela é questionável — o
-    `solvePnP` devolve a normal no Y —, e a correção ficou **adiada** lá.) A primeira versão do port
+15. ~~**O referencial do marcador é: plano em XY e normal em Z.**~~ **ERRADA — o referencial
+    correto é o do ARCore, e é o que a decisão 34 fechou com o projeto Android: X = largura,
+    Y = a NORMAL, Z = altura NA imagem.** A primeira versão do port
     supôs o referencial de imagem do ARCore (normal no Y) e o defeito só apareceu na
     primeira sessão de uso com hardware, em dois sintomas que o usuário descreveu com
     precisão: os modelos chegavam **deitados** sobre a figura e o controle **Elevação Z**
@@ -454,7 +454,19 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     deitá-lo —, o modelo carrega **de pé** (o zero dos sliders é "em pé") e o arrasto anda **no
     plano** do papel, sem tirar o modelo dele. O teste `girar o marcador pela sua normal…` gira a
     folha em 12 posições e cobra o "para cima" sempre sobre a normal (0,2 m de altura).
-    **O que fica em aberto:** o **eixo "para cima" do arquivo** é uma *suposição* (Z, o habitual
-    em CAD). Se um modelo glTF Y-up aparecer deitado, o que falta é a escolha explícita desse
-    eixo na carga — e o log já traz a caixa envolvente para identificar o caso (o modelo do
-    usuário mede 419 × 141 × 10 unidades: num edifício isso sugere Y-up, numa planta, Z-up).
+    **Fechada na 1.0.4 com a referência do app Android.** O usuário apontou o projeto Android
+    finalizado (`D:\PROGRAMACAO\ARK-Z ANDROID APP\ArkZ ARModelViewer`) e disse que a solução
+    estava lá — e estava: em `ui/ARViewScreen.kt`, o `anchorPosition` (linhas 1508–1512) usa
+    `x = -center.x · escala`, `y = -(center.y - halfExtent.y) · escala + elevação` e
+    `z = -center.z · escala`, com o referencial documentado logo acima (**X = largura, Y = a
+    NORMAL, Z = altura NA imagem** — o do ARCore para imagens, citando os nomes `extentX`/
+    `extentZ`), e **não existe rotação de apoio nenhuma**: o `ModelNode` recebe apenas
+    `Rotation(rotationX, rotationY, rotationZ)` (linha 800) — a orientação do arquivo mais o que
+    o usuário ajustar nos cursores.
+    A versão Windows ficou **igual**: mesma ancoragem, **sem apoio embutido**, e o arrasto (que o
+    Android não tem) andando no plano X–Z, com a normal intocada. O que tinha sobrado de
+    diferença era invenção minha — o apoio de 90° que a 1.0.2/1.0.3 embutia para "pôr o modelo
+    de pé" — e era ele que mudava a altura de carga e o eixo do giro.
+    **O que fica como característica, e não como defeito:** o modelo carrega na orientação do
+    arquivo, então um arquivo com outro eixo para cima pede o cursor **Rotação X** em 90° —
+    exatamente como no Android, e é o mesmo número nos dois aplicativos.

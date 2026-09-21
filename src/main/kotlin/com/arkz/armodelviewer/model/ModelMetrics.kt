@@ -76,7 +76,7 @@ class ModelMetrics(
      */
     fun anchorPosition(scale: Float, elevationMeters: Float): Vec3 = Vec3(
         x = -center.x * scale,
-        y = -(center.z - halfExtent.z) * scale + elevationMeters,
-        z = -center.y * scale,
+        y = -(center.y - halfExtent.y) * scale + elevationMeters,
+        z = -center.z * scale,
     )
 }

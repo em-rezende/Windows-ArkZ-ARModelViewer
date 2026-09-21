@@ -101,21 +101,9 @@ object ModelPlacement {
         // A versão anterior girava 90° em X aqui, supondo o plano do marcador em XY: o "para
         // cima" do modelo caía DENTRO do plano (no eixo Z, altura na imagem) e, ao girar a folha
         // pela normal, o modelo girava em torno do eixo errado — o defeito relatado em campo.
-        // Local: translação (ancoragem + arrasto) · rotação do usuário · APOIO · escala.
-        //
-        // O APOIO é o que põe o "para cima" do **arquivo** sobre a normal do marcador: os
-        // modelos desta família (CAD, SketchUp, e tudo que passa pelo Assimp ao converter
-        // `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para cima**, e a normal do marcador é o **+Y**.
-        // `Rx(−90°)` leva o +Z do arquivo exatamente para o +Y do marcador — sem ela o modelo
-        // carrega deitado sobre a figura e o usuário precisa de "Rotação em X = 90°" à mão.
-        // Com ela, o zero dos sliders é "em pé" e **girar a folha pela normal gira o modelo em
-        // torno de si mesmo**, no mesmo sentido da folha, em vez de deitá-lo (decisão 34).
         val local = multiply(
             translation(placement),
-            multiply(
-                eulerRotation(rotationDegrees),
-                multiply(eulerRotation(Vec3(-90f, 0f, 0f)), uniformScale(scale)),
-            ),
+            multiply(eulerRotation(rotationDegrees), uniformScale(scale)),
         )
 
         return multiply(markerPoseToMatrix(markerPose), local)

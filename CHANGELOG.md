@@ -8,6 +8,23 @@ Antes da 1.0.0 não houve versão pública: o aplicativo foi construído por eta
 (descritas em [`docs/roadmap.md`](docs/roadmap.md)) e conferido em uso real antes de
 ser publicado.
 
+## [1.0.4] — 2026-09-21
+
+- **A matemática de ancoragem passou a ser, linha por linha, a do app Android**
+  (`ARViewScreen.kt` → `ModelMetrics.anchorPosition`): `x = -center.x · escala`,
+  `y = -(center.y - halfExtent.y) · escala + elevação` e `z = -center.z · escala`, no referencial
+  do ARCore para imagens (**X = largura, Y = a NORMAL, Z = altura NA imagem**), o mesmo que
+  `Pose` e o `FilamentRenderer` já usavam.
+- **A rotação de apoio embutida foi removida**: como no Android, o modelo carrega na orientação
+  do arquivo e quem a ajusta são os cursores **Rotação X/Y/Z** (`Rotation(rotationX, rotationY,
+  rotationZ)` lá). Nenhum apoio escondido mexe na altura de carga nem no eixo do giro — e é por
+  isso que agora **girar a folha impressa pela normal gira o modelo em torno de si, no mesmo
+  sentido da folha**.
+- O **arrasto** (recurso desta versão, que o Android não tem) anda no **plano** da figura: X e Z,
+  com a normal (Y) intocada.
+- **200 testes**, incluindo o que gira o marcador em torno da normal e cobra o "para cima" sobre
+  ela. A **decisão 34** do roadmap fecha com a referência do projeto Android.
+
 ## [1.0.3] — 2026-09-21
 
 - **Girar o marcador pela normal agora gira o modelo em torno de si, no mesmo sentido do

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.arkz.armodelviewer"
-val appVersion = "1.0.3"
+val appVersion = "1.0.4"
 version = appVersion
 
 // Nome do pacote — fonte única, como a versão: o empacotamento precisa dele para saber onde a

@@ -68,8 +68,8 @@ class ModelMetricsTest {
         // Referencial do marcador (o do ARCore, e o que o `solvePnP` produz): X = largura,
         // **Y = normal** (sai do papel) e Z = altura NA imagem — decisão 34.
         assertEquals(-0.01f, position.x, TOLERANCE, "x = -centro.x × escala (largura)")
-        assertEquals(-0.01f, position.y, TOLERANCE, "y apoia a base do arquivo (Z) no plano, no eixo da normal")
-        assertEquals(-0.02f, position.z, TOLERANCE, "z centraliza a profundidade do arquivo (Y) na altura da imagem")
+        assertEquals(0.03f, position.y, TOLERANCE, "y apoia a base no plano, no eixo da normal")
+        assertEquals(-0.03f, position.z, TOLERANCE, "z centraliza a profundidade do arquivo na altura da imagem")
     }
 
     @Test
@@ -98,6 +98,6 @@ class ModelMetricsTest {
 
         assertEquals(-0.01f, small.x)
         assertEquals(-1f, big.x)
-        assertTrue(big.x < small.x, "um modelo maior exige deslocamento maior para centralizar na largura")
+        assertTrue(big.y > small.y, "um modelo maior exige deslocamento maior para apoiar a base")
     }
 }
