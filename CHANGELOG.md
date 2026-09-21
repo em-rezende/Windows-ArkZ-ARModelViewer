@@ -8,6 +8,22 @@ Antes da 1.0.0 não houve versão pública: o aplicativo foi construído por eta
 (descritas em [`docs/roadmap.md`](docs/roadmap.md)) e conferido em uso real antes de
 ser publicado.
 
+## [1.0.3] — 2026-09-21
+
+- **Girar o marcador pela normal agora gira o modelo em torno de si, no mesmo sentido do
+  marcador** — em vez de deitá-lo. Duas correções juntas:
+  1. o referencial do marcador passou a ser o que a detecção e o renderizador realmente usam —
+     **X = largura, Y = NORMAL (sai do papel), Z = altura NA imagem** —, então o "para cima" do
+     modelo vai para a normal e o arrasto anda no plano do papel (X e Z), com a normal intocada;
+  2. o **eixo "para cima" do arquivo** passou a ser tratado: os modelos desta família
+     (CAD/SketchUp, e os que o Assimp converte de `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para
+     cima**, e o `ModelPlacement` aplica `Rx(−90°)` como apoio, com o `ModelMetrics` apoiando a
+     base no **Z do arquivo**. O modelo carrega **de pé**, sem o "Rotação em X = 90°" à mão.
+- Teste que cobre o relato: `ModelPlacementTest` gira o marcador em torno da normal, de 30° em
+  30°, e cobra que o "para cima" do modelo continue sobre a normal. **200 testes.**
+- **Em aberto (decisão 34 do roadmap):** o eixo "para cima" do arquivo é uma **suposição** (Z).
+  Se um modelo glTF Y-up aparecer deitado, o que falta é a escolha explícita desse eixo.
+
 ## [1.0.2] — 2026-09-21
 
 - **O trecho de posição do modelo voltou ao comportamento aprovado em campo** — ancoragem,

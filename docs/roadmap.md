@@ -438,24 +438,23 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     (c) o `ModelPlacement`, porém, aplica uma **rotação de apoio de 90° em X** e a ancoragem do
     `ModelMetrics` supõe o plano em **XY** — o "para cima" do modelo acaba no eixo **Z** (a
     altura NA imagem), e é por isso que girar a folha pela normal **deita** o modelo.
-    **A correção foi escrita, medida e depois revertida.** Ela funcionava: o teste
-    `girar o marcador pela sua normal…` passou a medir 0,2 m **sobre a normal** (antes caía no
-    plano, com 1,2e-17). Mas, no mesmo pacote, ela mudou **duas coisas que o teste em campo já
-    havia aprovado**: o modelo passou a carregar **deitado** na máquina do usuário (que então
-    precisava de "Rotação em X = 90°") e o **arrasto vertical** trocou de eixo. O usuário pediu,
-    com razão, **uma correção por vez**: *"Corrija apenas o trecho que envolve a posição do
-    Modelo 3D, para que possamos confirmar se ficou correto e prosseguir com as outras
-    correções."*
-    Por isso, na **1.0.2**, o trecho de posição (ancoragem, apoio e arrasto) voltou ao estado
-    aprovado em campo, e a correção do giro fica **preservada como pendência**:
-    - o teste que a cobra está em `ModelPlacementTest`, **desativado** com `@Disabled` e o
-      comentário da pendência — ele foi escrito para **falhar** no código de hoje; basta
-      reativá-lo junto com a correção;
-    - a análise acima é a receita da correção: apoio da base **na normal** (Y), sem a rotação de
-      apoio, e o arrasto no plano verdadeiro (X e Z).
-    **O que ainda não se sabe** — e é o que a próxima sessão com o notebook precisa decidir, com
-    medição e não com suposição: por que, com o "para cima" sobre a normal (fisicamente o
-    correto), o usuário viu o modelo **deitado**. As duas hipóteses em aberto são o eixo "para
-    cima" do próprio **arquivo do modelo** (exportado de CAD, onde o Z é o habitual — a caixa
-    envolvente do modelo usado dá 419 × 141 × 10 unidades, com a base em Y = 0, o que tanto
-    pode ser um edifício Y-up quanto uma planta) e a **direção do arrasto** na tela.
+    **A correção foi aplicada em etapas — 1.0.1, revertida na 1.0.2 e fechada na 1.0.3** — e é
+    isso que a versão atual entrega:
+    (1) o **referencial físico** (o de cima): apoio da base **na normal** (Y), **sem** a rotação
+    de apoio antiga, e arrasto no plano verdadeiro (X e Z, com a normal intocada);
+    (2) o **eixo "para cima" do arquivo**: o teste em campo mostrou que o modelo do usuário —
+    e os desta família, exportados de CAD/SketchUp ou convertidos pelo Assimp — tem o **Z para
+    cima**. Com o referencial corrigido e o modelo presumido Y-up (a 1.0.1), ele carregava
+    **deitado** e exigia "Rotação em X = 90°" à mão. O `ModelPlacement` passou a aplicar
+    `Rx(−90°)` como **apoio**, levando o +Z do arquivo exatamente para a normal do marcador, e o
+    `ModelMetrics.anchorPosition` a apoiar a base no **Z do arquivo** e a centrar a profundidade
+    (o Y do arquivo) na altura da imagem.
+    **O que isso resolve, e o que o teste cobre:** com o "para cima" sobre a normal, **girar a
+    folha pela normal gira o modelo em torno de si mesmo, no mesmo sentido da folha** — em vez de
+    deitá-lo —, o modelo carrega **de pé** (o zero dos sliders é "em pé") e o arrasto anda **no
+    plano** do papel, sem tirar o modelo dele. O teste `girar o marcador pela sua normal…` gira a
+    folha em 12 posições e cobra o "para cima" sempre sobre a normal (0,2 m de altura).
+    **O que fica em aberto:** o **eixo "para cima" do arquivo** é uma *suposição* (Z, o habitual
+    em CAD). Se um modelo glTF Y-up aparecer deitado, o que falta é a escolha explícita desse
+    eixo na carga — e o log já traz a caixa envolvente para identificar o caso (o modelo do
+    usuário mede 419 × 141 × 10 unidades: num edifício isso sugere Y-up, numa planta, Z-up).

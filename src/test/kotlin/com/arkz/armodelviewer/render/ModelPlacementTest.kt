@@ -16,7 +16,6 @@ import com.arkz.armodelviewer.model.Vec3
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Disabled
 
 /**
  * Testes da ancoragem do modelo.
@@ -35,10 +34,14 @@ import org.junit.jupiter.api.Disabled
  */
 class ModelPlacementTest {
 
-    /** Modelo em milímetros, como os exportados por CAD: 20 unidades = 20 mm. */
+    /**
+     * Modelo em **unidades do arquivo**, na convenção dos exportadores de CAD/SketchUp:
+     * 20 unidades de largura (X), 10 de profundidade (Y) e 20 de **altura (Z)** — o "para cima"
+     * do arquivo é o Z, e é ele que o `ModelPlacement` leva para a normal do marcador.
+     */
     private val metrics = ModelMetrics(
-        center = Vec3(0f, 10f, 0f),
-        halfExtent = Vec3(10f, 10f, 5f),
+        center = Vec3(0f, 0f, 10f),
+        halfExtent = Vec3(10f, 5f, 10f),
     )
 
     private val identityPose = Pose(
@@ -65,25 +68,26 @@ class ModelPlacementTest {
             elevationMeters = 0f,
         )
 
-        // Com a rotação ZERO o modelo já aparece EM PÉ: o "para cima" do arquivo (Y) vai
-        // para a normal do marcador (Z). Sem o apoio o modelo deita sobre a figura, e era
-        // preciso girá-lo 90° em X à mão em cada modelo carregado.
-        val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
-        assertEquals(0f, top.x, 1e-5f)
-        assertEquals(0f, top.y, 1e-5f)
-        assertEquals(0.2f, top.z, 1e-5f, "o topo do modelo sobe pela normal")
+        // Com a rotação ZERO o modelo já aparece EM PÉ: o "para cima" do arquivo (+Y) **é** a
+        // normal do marcador — o Y do referencial do ARCore, que é o que o `solvePnP` produz
+        // (decisão 34). Não existe rotação de apoio: ela existia enquanto o código supunha o
+        // plano do marcador em XY, e o efeito era o modelo deitar sobre a figura.
+        val top = ModelPlacement.apply(matrix, Vec3(0f, 0f, 20f))
+        assertEquals(0f, top.x, 1e-5f, "o topo fica no centro da largura")
+        assertEquals(0.2f, top.y, 1e-5f, "o topo do modelo sobe pela normal")
+        assertEquals(0f, top.z, 1e-5f, "e não anda na altura da imagem")
 
         // O centro fica na metade da altura, acima do plano.
         val center = ModelPlacement.apply(matrix, metrics.center)
         assertEquals(0f, center.x, 1e-5f, "centralizado na largura")
-        assertEquals(0f, center.y, 1e-5f, "centrado na altura da imagem")
-        assertEquals(0.1f, center.z, 1e-5f, "metade da altura acima do plano")
+        assertEquals(0.1f, center.y, 1e-5f, "metade da altura acima do plano")
+        assertEquals(0f, center.z, 1e-5f, "centrado na altura da imagem")
 
-        // Um canto da BASE (y = 0 no arquivo) fica exatamente no plano da figura.
-        val base = ModelPlacement.apply(matrix, Vec3(-10f, 0f, -5f))
+        // Um canto da BASE (z = 0 no arquivo) fica exatamente no plano da figura.
+        val base = ModelPlacement.apply(matrix, Vec3(-10f, -5f, 0f))
         assertEquals(-0.1f, base.x, 1e-5f)
-        assertEquals(0.05f, base.y, 1e-5f)
-        assertEquals(0f, base.z, 1e-5f, "a base apoia no plano da figura")
+        assertEquals(0f, base.y, 1e-5f, "a base apoia no plano da figura (o eixo da normal)")
+        assertEquals(0.05f, base.z, 1e-5f)
     }
 
     @Test
@@ -104,11 +108,12 @@ class ModelPlacementTest {
             point,
         )
 
-        // O plano da figura é XY e a normal é o eixo Z: é o único eixo em que a elevação
-        // mexe — e é o "Elevação Z" da interface.
+        // A normal é o **Y** do referencial do marcador (X = largura, Y = normal, Z = altura NA
+        // imagem): é o único eixo em que a elevação mexe. O nome do controle — "Elevação Z" —
+        // veio do app Android e é o rótulo da interface, não o eixo (decisão 34).
         assertEquals(base.x, lifted.x, 1e-5f)
-        assertEquals(base.y, lifted.y, 1e-5f)
-        assertEquals(base.z + 0.5f, lifted.z, 1e-5f)
+        assertEquals(base.z, lifted.z, 1e-5f)
+        assertEquals(base.y + 0.5f, lifted.y, 1e-5f)
     }
 
     @Test
@@ -120,21 +125,21 @@ class ModelPlacementTest {
         val dragged = ModelPlacement.worldMatrix(
             identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3.ZERO,
             elevationMeters = 0f,
-            offsetMeters = Vec3(0.2f, -0.1f, 0f),
+            offsetMeters = Vec3(0.2f, 0f, -0.1f),
         )
 
         val center = ModelPlacement.apply(centered, metrics.center)
         val moved = ModelPlacement.apply(dragged, metrics.center)
 
-        // O arrasto entra exatamente como deslocamento no plano (X e Y do marcador) e não
-        // mexe na altura acima da figura (Z, o eixo da normal).
+        // O arrasto entra como deslocamento no PLANO — X (largura) e Z (altura NA imagem) — e
+        // não toca na normal (Y): arrastar nunca tira o modelo do papel (decisão 34).
         assertEquals(center.x + 0.2f, moved.x, 1e-5f)
-        assertEquals(center.y - 0.1f, moved.y, 1e-5f)
-        assertEquals(center.z, moved.z, 1e-5f, "o arrasto é no plano: a normal não se mexe")
+        assertEquals(center.z - 0.1f, moved.z, 1e-5f)
+        assertEquals(center.y, moved.y, 1e-5f, "o arrasto é no plano: a normal não se mexe")
 
-        // A base continua apoiada no plano: o arrasto não levanta nem afunda o modelo.
-        val base = ModelPlacement.apply(dragged, Vec3(-10f, 0f, -5f))
-        assertEquals(0f, base.z, 1e-5f)
+        // E a base continua apoiada no plano: o arrasto não levanta nem afunda o modelo.
+        val base = ModelPlacement.apply(dragged, Vec3(-10f, -5f, 0f))
+        assertEquals(0f, base.y, 1e-5f)
     }
 
     @Test
@@ -148,12 +153,14 @@ class ModelPlacementTest {
             elevationMeters = 0f,
         )
 
-        val topUpright = ModelPlacement.apply(upright, Vec3(0f, 20f, 0f))
-        val topLaidDown = ModelPlacement.apply(laidDown, Vec3(0f, 20f, 0f))
+        val topUpright = ModelPlacement.apply(upright, Vec3(0f, 0f, 20f))
+        val topLaidDown = ModelPlacement.apply(laidDown, Vec3(0f, 0f, 20f))
 
-        assertEquals(0.2f, topUpright.z, 1e-5f, "em pé: o topo sobe pela normal")
-        assertEquals(0f, topLaidDown.z, 1e-5f, "deitado: o topo fica no plano da figura")
-        assertEquals(-0.2f, topLaidDown.y, 1e-5f, "e vai para o lado NA imagem")
+        // O X do slider gira no **X do marcador** (a largura da figura): o 90° deita o modelo
+        // na altura da imagem, e o topo deixa a normal — é o par de eixos que o usuário vê.
+        assertEquals(0.2f, topUpright.y, 1e-5f, "em pé: o topo sobe pela normal")
+        assertEquals(0f, topLaidDown.y, 1e-5f, "deitado: o topo sai da normal")
+        assertEquals(0.2f, topLaidDown.z, 1e-5f, "e vai para a altura NA imagem")
     }
 
     @Test
@@ -208,26 +215,21 @@ class ModelPlacementTest {
         )
     }
 
-    /**
-     * **Pendência conhecida — decisão 34 do roadmap — com o teste pronto para o dia da correção.**
-     *
-     * Girar a folha impressa em torno da **normal** (o eixo que sai do papel) deve girar o modelo
-     * em torno de si mesmo, de pé sobre a figura. No código de hoje o "para cima" do modelo é
-     * colocado no eixo **Z** do marcador (a altura NA imagem) — é o que faz o modelo carregar de
-     * pé "na imagem", comportamento que o teste em campo aprovou — e, por isso, girar a folha
-     * pela normal **deita** o modelo.
-     *
-     * O referencial que o `solvePnP` produz tem a normal no **Y** (as quatro quinas do objeto têm
-     * Y = 0: veja `MarkerDetector.markerObjectPointsMat`), então a correção existe e já foi
-     * medida: com o "para cima" sobre a normal, o modelo gira em torno de si — é o que este teste
-     * cobra. Ela foi **adiada a pedido do usuário**, para separar as correções: no mesmo pacote,
-     * ela também mexeu na altura em que o modelo carregava (deitado) e no eixo do arrasto.
-     *
-     * Reative este teste **junto** com a correção: ele foi escrito para falhar no código de hoje.
-     */
-    @Disabled("decisão 34: correção do giro pela normal adiada a pedido do usuário")
     @Test
     fun `girar o marcador pela sua normal gira o modelo em torno de si, sem deita-lo`() {
+        // O referencial do marcador é o do ARCore — e o que o `solvePnP` produz a partir de
+        // `MarkerDetector.markerObjectPointsMat`: X = largura, **Y = NORMAL** (o eixo que sai
+        // do papel, com zero nas quatro quinas do objeto) e Z = altura NA imagem.
+        //
+        // Girar a folha impressa sobre a mesa é, portanto, girar o marcador em torno do
+        // PRÓPRIO eixo Y. Se o modelo está de pé sobre o papel, o "para cima" dele está
+        // nesse mesmo eixo: girar a folha NÃO pode mudar a direção do "para cima" no mundo —
+        // o modelo gira em torno de si mesmo e continua apoiado na figura.
+        //
+        // Era este o defeito relatado em campo: com o "para cima" do modelo caindo dentro do
+        // plano (no eixo Z), girar a folha fazia o modelo girar em torno do eixo errado.
+        val normal = Vec3(0f, 1f, 0f)
+
         for (passo in 0..11) {
             val graus = passo * 30.0
             val matrix = ModelPlacement.worldMatrix(
@@ -238,17 +240,26 @@ class ModelPlacementTest {
                 elevationMeters = 0f,
             )
 
-            // Direção do "para cima" do arquivo (+Y) depois de todo o empilhamento.
+            // Direção do "para cima" do arquivo (+Z, a altura) depois de todo o empilhamento.
             val base = ModelPlacement.apply(matrix, Vec3(0f, 0f, 0f))
-            val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
+            val top = ModelPlacement.apply(matrix, Vec3(0f, 0f, 20f))
             val up = Vec3(top.x - base.x, top.y - base.y, top.z - base.z)
 
-            // Com a correção: o "para cima" continua sobre a normal (0,2 m = a altura do modelo)
-            // em qualquer giro da folha — o modelo gira em torno de si e não deita.
+            // O "para cima" continua sendo a normal em qualquer giro da folha: o modelo gira em
+            // torno de si mesmo (0,2 m de altura, o tamanho escolhido) e não deita.
             assertEquals(0f, up.x, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
             assertEquals(0.2f, up.y, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
             assertEquals(0f, up.z, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
+
+            // E continua de pé na figura: o topo sobe 0,2 m pela normal, centrado no plano.
+            assertEquals(0f, top.x, 1e-5f)
+            assertEquals(0.2f, top.y, 1e-5f, "o topo do modelo sobe pela normal (Y do marcador)")
+            assertEquals(0f, top.z, 1e-5f)
         }
+
+        // A normal do marcador é a 2ª coluna da rotação da pose — o eixo pelo qual a folha gira.
+        val pose = spinAroundNormal(0.0)
+        assertEquals(1.0, pose[1, 1], 1e-6, "a coluna da normal da pose deveria ser +Y")
     }
 
     /** Pose de um marcador que gira em torno da **sua normal** (o eixo Y do referencial dele). */
