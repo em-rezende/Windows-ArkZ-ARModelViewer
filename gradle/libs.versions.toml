@@ -1,0 +1,67 @@
+# Catálogo de versões centralizado (Gradle Version Catalog).
+# Alinhado, onde faz sentido, ao projeto Android do mesmo app
+# (Kotlin 2.4.10 e Compose 2026.09.x) para facilitar a portabilidade das telas.
+
+[versions]
+# Ferramentas de build
+kotlin = "2.4.10"
+composeMultiplatform = "1.12.0"
+coroutines = "1.11.0"
+
+# JDK: o Filament no desktop é acessado por FFM (Project Panama), que exige
+# Java 22+. O toolchain abaixo é o que o projeto usa para compilar e para gerar
+# o instalador; o bytecode alvo continua em 22 (veja `jvmTarget`).
+jdk = "25"
+jvmTarget = "22"
+
+# Renderização 3D no desktop: binding comunitário do Filament (mesmo renderizador
+# do SceneView Android). NÃO existe artefato JVM oficial do Filament: o Google
+# removeu o suporte a Java/desktop em 2021 (google/filament#4263) e fechou o
+# pedido de KMP desktop como "not planned" (google/filament#7558).
+filamentKmp = "0.5.0"
+
+# Conversão de .obj/.stl/.ply/.3mf para GLB com o binding OFICIAL do Assimp no
+# LWJGL (o Filament só lê glTF/GLB — no Android, o SceneView faz essa conversão
+# em Kotlin puro; aqui ela é feita pelo Assimp).
+lwjgl = "3.3.6"
+
+# Câmera + visão computacional: captura (opencv_videoio) e detecção de marcador
+# (features2d, calib3d, imgproc, aruco).
+# O `opencv_core` do Bytedeco herda do OpenBLAS: sem o nativo dela o OpenCV não
+# inicializa (NoClassDefFoundError em `openblas_nolapack`), e a versão tem de
+# casar com o sufixo do JavaCPP.
+javaCpp = "1.5.14"
+opencv = "4.14.0-1.5.14"
+openblas = "0.3.34-1.5.14"
+
+# Testes
+junit = "5.11.4"
+junitPlatform = "1.11.4"
+
+[libraries]
+kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
+
+filament = { group = "io.github.erkko68.filament", name = "filament", version.ref = "filamentKmp" }
+filament-gltfio = { group = "io.github.erkko68.filament", name = "gltfio", version.ref = "filamentKmp" }
+filament-utils = { group = "io.github.erkko68.filament", name = "filament-utils", version.ref = "filamentKmp" }
+filament-compose = { group = "io.github.erkko68.filament", name = "filament-compose", version.ref = "filamentKmp" }
+# `filamat` = compilador de materiais do Filament, usável EM TEMPO DE EXECUÇÃO. É o que
+# permite criar o material do plano de fundo (o vídeo da câmera) sem depender de um
+# `.filamat` pré-compilado — os jars do binding não trazem nenhum, e o `matc` não tem
+# versão JVM (ver a decisão 6 em docs/roadmap.md).
+filament-filamat = { group = "io.github.erkko68.filament", name = "filamat", version.ref = "filamentKmp" }
+
+lwjgl = { group = "org.lwjgl", name = "lwjgl", version.ref = "lwjgl" }
+lwjgl-assimp = { group = "org.lwjgl", name = "lwjgl-assimp", version.ref = "lwjgl" }
+
+javacpp = { group = "org.bytedeco", name = "javacpp", version.ref = "javaCpp" }
+opencv = { group = "org.bytedeco", name = "opencv", version.ref = "opencv" }
+openblas = { group = "org.bytedeco", name = "openblas", version.ref = "openblas" }
+
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junitPlatform" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

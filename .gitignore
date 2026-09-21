@@ -1,0 +1,22 @@
+# Arquivos de build / locais
+*.iml
+.gradle/
+build/
+out/
+local.properties
+.idea/
+.DS_Store
+
+# Estado local das ferramentas (sessões do compilador Kotlin 2.x)
+.kotlin/
+
+# Artefatos gerados pelo Gradle / jpackage
+dist/
+*.jar
+*.zip
+*.msi
+*.exe
+*.hprof
+
+# Logs locais (o app também grava logs em %LOCALAPPDATA%)
+*.log

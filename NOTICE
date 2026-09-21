@@ -1,0 +1,62 @@
+ArkZ ARModelViewer Desktop
+Copyright (C) 2026 Ark-Z Arquitetura Ltda · Desenvolvedor: Ezequiel M. Rezende
+https://em-rezende.github.io/ · emrezende@gmail.com
+
+Distribuído sob a GNU General Public License v3.0 — veja o arquivo LICENSE
+nesta pasta. Repositório: https://github.com/em-rezende/Windows-ArkZ-ARModelViewer
+
+Este produto é a versão para Windows do ArkZ ARModelViewer para Android
+(https://github.com/em-rezende/Android-ArkZ-ARModelViewer), também distribuído
+sob a GNU General Public License v3.0.
+
+A GPL-3.0 cobre o CÓDIGO DESTE REPOSITÓRIO. Cada biblioteca de terceiros
+mantém a sua própria licença, listada abaixo.
+
+-------------------------------------------------------------------------------
+Bibliotecas de terceiros
+-------------------------------------------------------------------------------
+
+Google Filament (renderizador PBR) — Apache License 2.0
+  https://github.com/google/filament
+  Usado no desktop pelo binding comunitário filament-kmp, que também é
+  Apache License 2.0.
+
+filament-kmp (Erkko68) — Apache License 2.0
+  https://github.com/Erkko68/filament-kmp
+  Binding Kotlin Multiplatform do Filament para Desktop/JVM, iOS e Web.
+  Projeto comunitário, sem vínculo com o Google.
+
+SceneView — Apache License 2.0
+  https://github.com/sceneview/sceneview
+  Projeto de origem da arquitetura, das convenções de API e das decisões de
+  interface portadas para esta versão (a biblioteca em si é Android-only).
+
+JetBrains Compose Multiplatform / Kotlin — Apache License 2.0
+  https://github.com/JetBrains/compose-multiplatform / https://kotlinlang.org
+
+OpenCV (via JavaCV/Bytedeco) — Apache License 2.0 (OpenCV) e
+Apache License 2.0 (JavaCV/Bytedeco) com as licenças dos componentes nativos
+  https://opencv.org / https://github.com/bytedeco/javacv
+  Usado para captura de câmera (opencv_videoio) e visão computacional
+  (features2d, calib3d, aruco, imgproc).
+
+LWJGL (Lightweight Java Game Library) — BSD 3-Clause
+  https://www.lwjgl.org
+  Usado para o binding oficial do Open Asset Import Library (Assimp), que
+  converte .obj/.stl/.ply/.3mf para glTF/GLB.
+
+Open Asset Import Library (Assimp) — BSD 3-Clause
+  https://github.com/assimp/assimp
+
+Material Design Icons (Google) — Apache License 2.0
+  Ícones usados em `src/main/kotlin/com/arkz/armodelviewer/ui/icons/`.
+
+-------------------------------------------------------------------------------
+Licença do projeto
+-------------------------------------------------------------------------------
+
+Este programa é software livre: você pode redistribuí-lo e/ou modificá-lo sob
+os termos da GNU General Public License, versão 3, publicada pela Free Software
+Foundation. Este programa é distribuído na esperança de que seja útil, mas SEM
+NENHUMA GARANTIA; sem mesmo a garantia implícita de COMERCIABILIDADE ou
+ADEQUAÇÃO A UM PROPÓSITO ESPECÍFICO. Veja o arquivo LICENSE na raiz do projeto.

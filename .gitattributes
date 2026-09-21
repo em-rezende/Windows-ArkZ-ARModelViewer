@@ -1,0 +1,46 @@
+# Normaliza o fim de linha: o desenvolvimento é feito no Windows e o repositório
+# (GitHub) espera LF. Sem isto, o Git converteria arquivos texto e o diff entre
+# Windows/Linux ficaria cheio de "linhas alteradas" que ninguém mudou.
+* text=auto eol=lf
+
+# Binários: nunca converter (nem tentar tratar como texto)
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.webp       binary
+*.ico        binary
+*.jar        binary
+*.exe        binary
+*.dll        binary
+*.msi        binary
+*.zip        binary
+*.hprof      binary
+*.dmp        binary
+
+# Modelos 3D de exemplo: tratados como binários para o Git nunca alterar o
+# conteúdo (STL/PLY/GLB binários seriam corrompidos pela conversão de fim de linha).
+*.glb        binary
+*.gltf       binary
+*.obj        binary
+*.mtl        binary
+*.ply        binary
+*.stl        binary
+*.3mf        binary
+*.fbx        binary
+*.dae        binary
+*.blend      binary
+*.skp        binary
+
+# Scripts que rodam no Windows continuam em CRLF
+*.ps1        text eol=crlf
+*.bat        text eol=crlf
+*.cmd        text eol=crlf
+
+# Os bundles de idioma são lidos pelo ResourceBundle: LF é o que o pipeline grava
+*.properties text eol=lf
+
+# Ícones e folhas de marcador ficam fora (são binários, já cobertos acima)
+
+# Gradle Wrapper (jar binário + script de shell com LF)
+gradle/wrapper/gradle-wrapper.jar binary
+gradlew                           text eol=lf
