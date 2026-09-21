@@ -425,37 +425,36 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     no pt-BR: os textos herdados do Android falavam de `adb logcat` e da pinça de tela. Os
     `help_body` corrigidos ficaram **também** em `tools/i18n-overrides/`, para o pipeline de
     idiomas continuar idempotente (a Ajuda do Android mencionava o Logcat em seis idiomas).
-34. **O referencial do marcador estava invertido — e o defeito era meu.** O usuário relatou
-    ("quando giro o marcador pela sua normal, o modelo gira no eixo errado") e pediu
-    verificação. A causa não estava no gesto nem no `solvePnP`: estava na **suposição que eu
-    havia gravado na decisão 15**, de que o plano do marcador fosse XY. Não é. As quatro
-    quinas que o detector entrega ao `solvePnP` (`MarkerDetector.markerObjectPointsMat`) têm
-    **Y = 0** — o marcador é plano nesse eixo —, e o resultado é o referencial do ARCore:
-    **X = largura, Y = NORMAL (sai do papel, na direção de quem olha) e Z = altura NA imagem**.
-    Os nomes `extentX`/`extentZ` do `AugmentedImage` sempre disseram isso, e o KDoc do
-    `Pose` também.
-    Com o referencial invertido, a "rotação de apoio" de 90° em X jogava o "para cima" do
-    modelo (o +Y do glTF) **para dentro do plano** (no Z, altura na imagem): o modelo ficava
-    deitado sobre a figura e, ao girar a folha impressa pela normal — que é o Y verdadeiro —,
-    girava em torno do eixo errado. É exatamente o que o usuário descreveu. O que foi
-    corrigido:
-    (a) `ModelMetrics.anchorPosition`: `y = -(center.y - halfExtent.y) * scale + elevação`
-    (apoia a base **na normal**) e `z = -center.z * scale` (centraliza na altura da imagem);
-    (b) **a "rotação de apoio" foi removida** de `ModelPlacement`: o +Y do arquivo **já é** a
-    normal, então o modelo carrega de pé e o zero dos sliders é "em pé";
-    (c) o **arrasto** passou a andar no plano de verdade — `x` e `z`, com o **`y` sempre em
-    zero** (a normal): arrastar não tira mais o modelo do papel (`InteractiveInput.panOffset`
-    e `SceneComposer.setOffsetMeters`);
-    (d) **um teste que reproduz o relato**: `ModelPlacementTest` gira o marcador em torno da
-    normal (12 posições, de 30° em 30°) e cobra que o "para cima" do modelo continue sobre a
-    normal — ele **falhava** antes da correção (o valor caía no plano) e passa agora. Os
-    testes que eu havia calibrado pelo referencial errado foram reescritos
-    (`ModelPlacementTest`, `ModelMetricsTest`, `InteractiveInputTest`, `SceneComposerTest`), e
-    a decisão 15 ficou marcada como ERRADA;
-    (e) a documentação foi corrigida em `docs/rendering.md` (a nota que afirmava "plano em
-    XY") e nos KDocs de `ModelMetrics` e `InteractiveInput`.
-    **O que fica para o campo:** o arrasto **vertical** mudou de eixo (era a normal, agora é o
-    plano), então a sensação que o teste em campo havia aprovado na decisão 21 não vale mais —
-    agora o modelo **acompanha o ponteiro**. É a única coisa que pede reconferência no
-    notebook, junto com a conferência de que o modelo **gira em torno de si** quando a folha
-    gira.
+34. **O referencial do marcador: o que a análise diz, o que o campo aprovou e o que fica
+    adiado.** O usuário relatou ("quando giro o marcador pela sua normal, o modelo gira no
+    eixo errado") e pediu verificação. A análise do código é esta:
+    (a) as quatro quinas que o detector entrega ao `solvePnP`
+    (`MarkerDetector.markerObjectPointsMat`) têm **Y = 0** — o marcador é plano nesse eixo —, e
+    o KDoc do `Pose` e os nomes `extentX`/`extentZ` do `AugmentedImage` dizem o mesmo: o
+    referencial que sai da detecção tem **X = largura, Y = NORMAL, Z = altura NA imagem**;
+    (b) a cadeia de renderização confirma esse referencial: o `CameraProjection` monta a matriz
+    das intrínsecas com o Y para cima e o `FilamentRenderer` usa `camera.lookAt(…, 0, 1, 0)`;
+    (c) o `ModelPlacement`, porém, aplica uma **rotação de apoio de 90° em X** e a ancoragem do
+    `ModelMetrics` supõe o plano em **XY** — o "para cima" do modelo acaba no eixo **Z** (a
+    altura NA imagem), e é por isso que girar a folha pela normal **deita** o modelo.
+    **A correção foi escrita, medida e depois revertida.** Ela funcionava: o teste
+    `girar o marcador pela sua normal…` passou a medir 0,2 m **sobre a normal** (antes caía no
+    plano, com 1,2e-17). Mas, no mesmo pacote, ela mudou **duas coisas que o teste em campo já
+    havia aprovado**: o modelo passou a carregar **deitado** na máquina do usuário (que então
+    precisava de "Rotação em X = 90°") e o **arrasto vertical** trocou de eixo. O usuário pediu,
+    com razão, **uma correção por vez**: *"Corrija apenas o trecho que envolve a posição do
+    Modelo 3D, para que possamos confirmar se ficou correto e prosseguir com as outras
+    correções."*
+    Por isso, na **1.0.2**, o trecho de posição (ancoragem, apoio e arrasto) voltou ao estado
+    aprovado em campo, e a correção do giro fica **preservada como pendência**:
+    - o teste que a cobra está em `ModelPlacementTest`, **desativado** com `@Disabled` e o
+      comentário da pendência — ele foi escrito para **falhar** no código de hoje; basta
+      reativá-lo junto com a correção;
+    - a análise acima é a receita da correção: apoio da base **na normal** (Y), sem a rotação de
+      apoio, e o arrasto no plano verdadeiro (X e Z).
+    **O que ainda não se sabe** — e é o que a próxima sessão com o notebook precisa decidir, com
+    medição e não com suposição: por que, com o "para cima" sobre a normal (fisicamente o
+    correto), o usuário viu o modelo **deitado**. As duas hipóteses em aberto são o eixo "para
+    cima" do próprio **arquivo do modelo** (exportado de CAD, onde o Z é o habitual — a caixa
+    envolvente do modelo usado dá 419 × 141 × 10 unidades, com a base em Y = 0, o que tanto
+    pode ser um edifício Y-up quanto uma planta) e a **direção do arrasto** na tela.

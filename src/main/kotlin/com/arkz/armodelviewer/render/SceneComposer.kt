@@ -202,16 +202,14 @@ class SceneComposer(
     /**
      * Deslocamento no **plano da figura** (o arrasto do "modo livre"), em metros.
      *
-     * **X (largura)** e **Z (altura NA imagem)** são limitados à faixa do arrasto
-     * ([InteractiveInput.MAX_PAN_METERS]): dá para pôr o modelo ao lado ou à frente da figura,
-     * mas não para perdê-lo de vista. O **Y é a normal** do marcador e fica sempre em **zero**:
-     * o arrasto nunca tira o modelo do papel (decisão 34).
+     * X e Y são limitados à faixa do arrasto ([InteractiveInput.MAX_PAN_METERS]): dá para
+     * pôr o modelo ao lado ou à frente da figura, mas não para perdê-lo de vista.
      */
     fun setOffsetMeters(offset: Vec3) {
         _offsetMeters.value = Vec3(
             x = offset.x.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
-            y = 0f,
-            z = offset.z.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
+            y = offset.y.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
+            z = 0f,
         )
     }
 

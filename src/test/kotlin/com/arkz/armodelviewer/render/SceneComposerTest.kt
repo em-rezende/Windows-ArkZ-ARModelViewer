@@ -345,26 +345,25 @@ class SceneComposerTest {
             composer.setModel(model())
             composer.start()
 
-            // Arrasto dentro do limite: chega como está — e o arrasto anda no PLANO da figura
-            // (X = largura e Z = altura NA imagem); o Y é a normal e fica em zero (decisão 34).
-            composer.setOffsetMeters(Vec3(0.2f, 0f, -0.3f))
+            // Arrasto dentro do limite: chega como está.
+            composer.setOffsetMeters(Vec3(0.2f, -0.3f, 0f))
             composer.submit(background(), listOf(marker(TrackingState.TRACKING)))
             await { renderer.scenes.isNotEmpty() }
 
             val scene = assertNotNull(renderer.scenes.last())
             assertEquals(0.2f, scene.offsetMeters.x, 1e-6f)
-            assertEquals(-0.3f, scene.offsetMeters.z, 1e-6f)
-            assertEquals(0f, scene.offsetMeters.y, 1e-6f, "o arrasto é no plano da figura")
+            assertEquals(-0.3f, scene.offsetMeters.y, 1e-6f)
+            assertEquals(0f, scene.offsetMeters.z, 1e-6f, "o arrasto é no plano da figura")
 
             // Arrasto além do limite: o modelo não pode sair de perto da figura.
-            composer.setOffsetMeters(Vec3(9f, 9f, 5f))
+            composer.setOffsetMeters(Vec3(9f, -9f, 5f))
             composer.submit(background(), listOf(marker(TrackingState.TRACKING)))
             await { renderer.scenes.size >= 2 }
 
             val clamped = assertNotNull(renderer.scenes.last())
             assertEquals(InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.x, 1e-6f)
-            assertEquals(InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.z, 1e-6f)
-            assertEquals(0f, clamped.offsetMeters.y, 1e-6f)
+            assertEquals(-InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.y, 1e-6f)
+            assertEquals(0f, clamped.offsetMeters.z, 1e-6f)
         } finally {
             composer.close()
         }

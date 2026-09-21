@@ -89,18 +89,15 @@ object InteractiveInput {
     }
 
     /**
-     * Deslocamento do modelo no **plano da figura**, a partir de um arrasto em pixels da tela.
+     * Deslocamento do modelo no **plano da figura** (os eixos X e Y do marcador), a partir de
+     * um arrasto em pixels da tela.
      *
-     * O plano do marcador são os eixos **X (largura)** e **Z (altura NA imagem)**; o eixo **Y é
-     * a normal**, e o arrasto **não** o toca: arrastar nunca tira o modelo do papel (decisão 34).
-     * Este é o mesmo referencial de `ModelMetrics.anchorPosition` — o do ARCore, e o que o
-     * `solvePnP` produz.
-     *
-     * O sinal do eixo vertical foi **corrigido pelo teste em campo** (decisão 21) e reconferido
-     * depois da correção do referencial (decisão 34): arrastar o mouse para cima **traz** o
-     * modelo para a frente na figura, e arrastar para baixo o afasta — a expectativa de quem
-     * arrasta. A tela cresce para baixo e o Z do marcador também (ele é a "altura NA imagem"),
-     * então os dois eixos apontam para o mesmo lado e o sinal não se inverte no caminho.
+     * O sinal do eixo vertical foi **corrigido pelo teste em campo** (decisão 21): arrastar o
+     * mouse para cima **traz** o modelo para a frente na figura, e arrastar para baixo o
+     * afasta — a expectativa de quem arrasta. Vale registrar por que a primeira versão ficou
+     * ao contrário: eu justifiquei o sinal pelo eixo da tela (que cresce para baixo) contra o
+     * Y do marcador (que cresce para cima) e escolhi o lado errado da mesma conta. Como o
+     * arrasto horizontal já estava certo, a correção ficou isolada no sinal do Y.
      *
      * @param current deslocamento atual, em metros.
      * @param dxPixels arrasto horizontal (pixels; positivo = para a direita).
@@ -118,8 +115,8 @@ object InteractiveInput {
 
         return Vec3(
             x = (current.x + dxPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
-            y = 0f,
-            z = (current.z + dyPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
+            y = (current.y + dyPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
+            z = current.z,
         )
     }
 }

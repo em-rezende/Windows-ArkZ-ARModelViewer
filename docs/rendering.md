@@ -51,23 +51,27 @@ Três decisões estruturam esse desenho:
 | `CameraProjection` | Onde o ponto 3D cai **na imagem**? (`u = fx·X/Z + cx`) | `render/CameraProjection.kt` |
 | `ModelPlacement` | Onde a geometria do arquivo cai **no mundo**? | `render/ModelPlacement.kt` |
 
-**Referenciais** — o referencial do **marcador** é o do ARCore, e é o que o `solvePnP` produz a
-partir das quatro quinas do objeto (`MarkerDetector.markerObjectPointsMat`, em que o Y é
-**zero**): **X = largura**, **Y = NORMAL** (sai do plano da figura, na direção de quem olha) e
-**Z = altura NA imagem**. A correção deste referencial é a **decisão 34** do roadmap: antes
-dela o código supunha o plano em XY, e o modelo girava em torno do eixo errado quando a folha
-impressa girava.
+**Referenciais** (a convenção do **marcador** foi corrigida na prática — veja a nota abaixo):
 
 * **câmera**: +X para a direita, +Y para cima, olhando para **−Z** (um ponto à frente tem z
   negativo);
-* **marcador**: +X = largura da imagem, **+Y = a normal** e **+Z = altura NA imagem** (para
-  baixo). O **plano da figura é o XZ**, e é por isso que a **elevação** — o controle chamado
-  `Elevação Z` na interface, nome herdado do app Android — é o único ajuste que tira o modelo
-  do plano: ela desloca o modelo ao longo da normal, que é o eixo **Y**.
+* **marcador**: +X = largura da imagem, **+Y = altura NA imagem** e **+Z = a normal** (sai do
+  plano da figura, na direção de quem olha). O plano da figura é o **XY**, e é por isso que
+  `Elevação Z` é o único controle que tira o modelo do plano.
+
+> **A nota "abaixo" é a correção**: a primeira versão desta documentação (e do código)
+> supunha o referencial de imagem do ARCore — em que o "para cima" é a **normal** —, mas a
+> pose que o `solvePnP` produz a partir dos quatro cantos do marcador tem o **plano em XY** e
+> a normal em **Z**, como o app Android sempre disse. O sintoma era duplo e apareceu na
+> primeira sessão de uso com hardware: os modelos chegavam **deitados** sobre a figura e o
+> controle de elevação empurrava o modelo **de través**, dentro do plano. Além de corrigir a
+> ancoragem, o `ModelPlacement` passou a aplicar uma **rotação de apoio** que põe em pé um
+> modelo cujo "para cima" é o +Y (a convenção do glTF e da maioria dos CAD) — o zero dos
+> sliders passou a significar "em pé".
 
 > **Cuidado com a pose "identidade" ao escrever testes**: um marcador com rotação de
 > identidade fica **de perfil** para a câmera (o plano dele contém a direção de visão). Um
-> marcador de frente para a câmera tem a rotação que leva o **+Y** dele (a normal) ao **+Z** do
+> marcador de frente para a câmera tem a rotação que leva o +Z dele (a normal) ao +Z do
 > mundo. Um teste chegou a medir "zero pixel de modelo" por causa disso — a pose precisa ser
 > fisicamente possível.
 

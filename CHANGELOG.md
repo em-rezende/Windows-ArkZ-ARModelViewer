@@ -8,6 +8,18 @@ Antes da 1.0.0 não houve versão pública: o aplicativo foi construído por eta
 (descritas em [`docs/roadmap.md`](docs/roadmap.md)) e conferido em uso real antes de
 ser publicado.
 
+## [1.0.2] — 2026-09-21
+
+- **O trecho de posição do modelo voltou ao comportamento aprovado em campo** — ancoragem,
+  apoio da base e arrasto com o mouse. A correção de referencial da 1.0.1 havia mudado, junto
+  com o giro pela normal, duas coisas que já estavam aprovadas: o modelo passou a carregar
+  **deitado** (na máquina do usuário, exigindo "Rotação em X = 90°") e o arrasto vertical
+  trocou de eixo. Como o pedido é corrigir **um comportamento por vez**, a posição foi
+  restaurada e a correção do giro ficou adiada.
+- A correção do giro pela normal fica **preservada como pendência**: o teste que a cobra está
+  em `ModelPlacementTest` (desativado com `@Disabled`, escrito para falhar no código de hoje) e
+  a receita da correção está na **decisão 34** do roadmap. **199 testes.**
+
 ## [1.0.1] — 2026-09-21
 
 Correção de um defeito de **referencial** na ancoragem do modelo, relatado em uso real.
