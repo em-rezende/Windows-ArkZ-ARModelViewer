@@ -45,6 +45,20 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 As três são capturas reais do aplicativo **1.0.7**, na mesma máquina do teste em campo (webcam
 integrada, folha impressa do **Marcador A** apoiada na mesa).
 
+## Baixar e instalar
+
+A versão publicada é a **[1.0.7](https://github.com/em-rezende/Windows-ArkZ-ARModelViewer/releases/tag/v1.0.7)**,
+que traz dois anexos na página da release:
+
+| Anexo | Para quem |
+|---|---|
+| `ArkZ.ARModelViewer-1.0.7.msi` | **Instalador** (recomendado): atalho no menu Iniciar e na área de trabalho, desinstalador em *Configurações › Aplicativos* e `upgradeUuid` fixo. Pede o *Visual C++ Redistributable 2015-2022* na máquina de destino. |
+| `ArkZ-ARModelViewer-1.0.7-portatil.zip` | **Portátil**: descompacte e execute `ArkZ ARModelViewer.exe`. Não instala nada — o JRE e o runtime do C++ vão junto. |
+
+O `.msi` não é assinado digitalmente, então o Windows avisa *"Editor desconhecido"*: é esperado (**Mais
+informações › Executar assim mesmo**). Para compilar do código em vez de baixar, siga
+[`docs/development.md`](docs/development.md).
+
 ## Requisitos
 
 | Item | Versão |
