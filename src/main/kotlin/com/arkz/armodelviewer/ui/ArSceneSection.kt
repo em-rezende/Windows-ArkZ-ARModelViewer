@@ -252,7 +252,10 @@ fun ArSceneSection(
         }
     }
 
-    /** Arrasto do "modo livre": move o modelo no plano da figura. */
+    /**
+     * Arrasto do "modo livre": move o modelo na largura da figura (X) e no frente–trás (Y) —
+     * veja `InteractiveInput.panOffset`.
+     */
     fun panBy(dxPixels: Float, dyPixels: Float) {
         composer.setOffsetMeters(
             InteractiveInput.panOffset(
@@ -560,8 +563,8 @@ fun ArSceneSection(
         }
 
         // Os gestos da etapa 6 ficam na **área do vídeo** (e não na tela toda): arrastar sobre
-        // a imagem move o modelo no plano da figura, e a roda com `Ctrl` dá o zoom. É o mesmo
-        // lugar em que o app Android recebia a pinça.
+        // a imagem move o modelo na largura da figura e no frente–trás (veja `InteractiveInput`),
+        // e a roda com `Ctrl` dá o zoom. É o mesmo lugar em que o app Android recebia a pinça.
         Box(
             modifier = Modifier
                 .fillMaxWidth()

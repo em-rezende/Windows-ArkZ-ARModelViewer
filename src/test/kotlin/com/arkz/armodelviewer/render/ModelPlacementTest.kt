@@ -30,14 +30,58 @@ import kotlin.test.assertTrue
  * em que o `ModelMetrics` trabalha.
  *
  * Convenção do referencial do marcador (a do ARCore para imagens, mantida de propósito):
- * **X** = largura da imagem, **Y** = normal (sai do plano), **Z** = altura NA imagem.
+ * **X** = largura da imagem, **Y** = normal (sai do plano), **Z** = altura NA imagem — e o
+ * **plano** da figura é o **XZ**.
+ *
+ * ## O que estes testes cobram da correspondência entre o ARQUIVO e o marcador (decisão 38)
+ *
+ * O `ModelPlacement` adota uma correspondência **fixa** entre os eixos do arquivo (glTF: **+Y**
+ * para cima, **+Z** para a frente) e os do marcador: o plano **XY** do arquivo **é** o plano da
+ * figura, e o **+Z** do arquivo (o "frente" — no `House.glb` do repositório, a face da porta
+ * vermelha) **é** a normal. É medido aqui de três formas:
+ *
+ *  1. **de frente para a câmera** (a situação do desktop) o modelo aparece **de pé** — o +Y do
+ *     arquivo no +Y do **mundo** — e com a face virada para quem olha (o +Z do arquivo no +Z do
+ *     mundo, a direção da câmera);
+ *  2. **girando a folha pela normal** a frente não sai do eixo do giro e o "para cima" acompanha o
+ *     giro da folha (o modelo gira no **próprio eixo Z**);
+ *  3. **a ancoragem** apoia a face de **trás** no plano (a espessura do modelo sai da figura) e
+ *     centra o modelo na largura e na altura da imagem.
  */
 class ModelPlacementTest {
 
-    /** Modelo em milímetros, como os exportados por CAD: 20 unidades = 20 mm. */
+    /**
+     * Modelo de teste em unidades do arquivo: **20 × 20 × 10**, com a base no `y = 0` (a convenção
+     * do glTF para o que fica "em pé") e a face da frente no `z = +5` — a forma do `House.glb` (a
+     * casa de referência do repositório), em escala.
+     */
     private val metrics = ModelMetrics(
         center = Vec3(0f, 10f, 0f),
         halfExtent = Vec3(10f, 10f, 5f),
+    )
+
+    /** A casa de referência (`3d_models/House.glb`), como o `AssimpModelLoaderTest` a mede. */
+    private val houseMetrics = ModelMetrics(
+        center = Vec3(0f, 2.25f, 0f),
+        halfExtent = Vec3(2.5f, 2.25f, 2.5f),
+    )
+
+    /**
+     * Marcador **de frente para a câmera**, a 50 cm — o caso do relato de campo (o "Marcador A"
+     * virado para quem olha).
+     *
+     * Os eixos do marcador no mundo são as **colunas** da rotação (o `Pose` guarda a rotação em
+     * ordem de linha e a aplica como `mundo = R · ponto`): a largura para a direita `(1, 0, 0)`, a
+     * **normal** para fora da tela — na direção de quem olha — `(0, 0, 1)` e a altura NA imagem
+     * para baixo `(0, −1, 0)`, com o plano da figura no `z = −0,5`.
+     */
+    private val facingCamera = Pose(
+        rotation = doubleArrayOf(
+            1.0, 0.0, 0.0,
+            0.0, 0.0, -1.0,
+            0.0, 1.0, 0.0,
+        ),
+        translation = Vec3(0f, 0f, -0.5f),
     )
 
     private val identityPose = Pose(
@@ -55,7 +99,7 @@ class ModelPlacementTest {
     }
 
     @Test
-    fun `o modelo fica em pe sobre a figura, centralizado e com a base no plano`() {
+    fun `o modelo carrega em pe, com a frente virada para quem olha e o fundo no plano`() {
         val matrix = ModelPlacement.worldMatrix(
             markerPose = identityPose,
             metrics = metrics,
@@ -64,26 +108,93 @@ class ModelPlacementTest {
             elevationMeters = 0f,
         )
 
-        // Com a rotação ZERO o modelo já aparece EM PÉ: o "para cima" do arquivo (+Y) **é** a
-        // normal do marcador — o Y do referencial do ARCore, que é o que o `solvePnP` produz
-        // (decisão 34). Não existe rotação de apoio: ela existia enquanto o código supunha o
-        // plano do marcador em XY, e o efeito era o modelo deitar sobre a figura.
-        val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
-        assertEquals(0f, top.x, 1e-5f, "o topo fica no centro da largura")
-        assertEquals(0.2f, top.y, 1e-5f, "o topo do modelo sobe pela normal")
-        assertEquals(0f, top.z, 1e-5f, "e não anda na altura da imagem")
+        // O "para cima" do arquivo (+Y) vai para a **altura NA imagem** — o −Z do marcador —, e
+        // não para a normal: é o que faz o modelo carregar **de pé** em vez de deitado de costas.
+        assertVector(
+            Vec3(0f, 0f, -1f),
+            direction(matrix, Vec3(0f, 20f, 0f)),
+            message = "o 'para cima' do arquivo tem de ser a altura NA imagem",
+        )
+        // E o quanto ele sobe na imagem é o tamanho escolhido (0,2 m = a maior dimensão do arquivo).
+        assertEquals(
+            0.2f,
+            Math.abs(segment(matrix, Vec3(0f, 20f, 0f)).z),
+            1e-5f,
+            "a altura do modelo na imagem tem de ser o tamanho escolhido",
+        )
 
-        // O centro fica na metade da altura, acima do plano.
+        // A face da frente (o +Z do arquivo — no `House.glb`, a porta) sai pela NORMAL, na direção
+        // de quem olha; a face de trás (o −Z do arquivo) apoia no plano da figura.
+        assertVector(
+            Vec3(0f, 1f, 0f),
+            direction(matrix, Vec3(0f, 0f, 5f)),
+            message = "a frente do arquivo tem de ser a normal do marcador",
+        )
+        assertEquals(
+            0f,
+            ModelPlacement.apply(matrix, Vec3(0f, 0f, -5f)).y,
+            1e-5f,
+            "o fundo do modelo apoia no plano da figura (o eixo da normal)",
+        )
+
+        // Centralizado na largura e na altura da imagem; a espessura fica toda à frente do plano
+        // (a caixa é 20 × 20 × 10: a frente a 0,1 m e o fundo em 0,0 m).
         val center = ModelPlacement.apply(matrix, metrics.center)
         assertEquals(0f, center.x, 1e-5f, "centralizado na largura")
-        assertEquals(0.1f, center.y, 1e-5f, "metade da altura acima do plano")
-        assertEquals(0f, center.z, 1e-5f, "centrado na altura da imagem")
+        assertEquals(0f, center.z, 1e-5f, "centralizado na altura da imagem")
+        assertEquals(0.05f, center.y, 1e-5f, "o centro fica a meia espessura à frente do plano")
+    }
 
-        // Um canto da BASE (y = 0 no arquivo) fica exatamente no plano da figura.
-        val base = ModelPlacement.apply(matrix, Vec3(-10f, 0f, -5f))
-        assertEquals(-0.1f, base.x, 1e-5f)
-        assertEquals(0f, base.y, 1e-5f, "a base apoia no plano da figura (o eixo da normal)")
-        assertEquals(-0.05f, base.z, 1e-5f)
+    @Test
+    fun `de frente para a camera o modelo aparece de pe com a frente virada para quem olha`() {
+        // O caso do desktop — o marcador na mão, virado para a webcam —, e é a situação do relato.
+        // O mundo é o da câmera: +X para a direita, +Y para cima e +Z para fora da tela, na direção
+        // de quem olha.
+        val matrix = ModelPlacement.worldMatrix(
+            markerPose = facingCamera,
+            metrics = houseMetrics,
+            sizeMeters = 0.13f,
+            rotationDegrees = Vec3.ZERO,
+            elevationMeters = 0f,
+        )
+
+        // DE PÉ: o "para cima" do arquivo é o +Y do MUNDO. Com a correspondência de identidade (até
+        // a 1.0.7) ele caía na normal — que aqui é o +Z do mundo — e a casa carregava deitada de
+        // costas, com o telhado apontando para a câmera.
+        assertVector(
+            Vec3(0f, 1f, 0f),
+            direction(matrix, Vec3(0f, houseMetrics.halfExtent.y * 2f, 0f)),
+            message = "o modelo tem de carregar de pé",
+        )
+
+        // A PORTA (o +Z do arquivo) olha para quem está vendo: no mundo, o +Z da câmera.
+        assertVector(
+            Vec3(0f, 0f, 1f),
+            direction(matrix, Vec3(0f, 0f, houseMetrics.halfExtent.z)),
+            message = "a porta tem de ficar virada para a câmera",
+        )
+
+        // E a largura do arquivo é a largura da imagem — sem espelhamento nenhum no caminho.
+        assertVector(
+            Vec3(1f, 0f, 0f),
+            direction(matrix, Vec3(houseMetrics.halfExtent.x, 0f, 0f)),
+            message = "a largura do arquivo tem de ser a largura da figura",
+        )
+
+        // A parede de trás apoia no plano da figura (o z = −0,5 do marcador) e a frente sai dele na
+        // direção de quem olha: 0,13 m à frente (o tamanho escolhido, que é a maior dimensão).
+        assertEquals(
+            -0.5f,
+            ModelPlacement.apply(matrix, Vec3(0f, 0f, -2.5f)).z,
+            1e-5f,
+            "a parede de trás apoia no plano da figura",
+        )
+        assertEquals(
+            -0.37f,
+            ModelPlacement.apply(matrix, Vec3(0f, 0f, 2.5f)).z,
+            1e-5f,
+            "a frente sai da figura na direção de quem olha",
+        )
     }
 
     @Test
@@ -105,15 +216,17 @@ class ModelPlacementTest {
         )
 
         // A normal é o **Y** do referencial do marcador (X = largura, Y = normal, Z = altura NA
-        // imagem): é o único eixo em que a elevação mexe. O nome do controle — "Elevação Z" —
-        // veio do app Android e é o rótulo da interface, não o eixo (decisão 34).
+        // imagem): é o único eixo em que a elevação mexe. E é o **+Z do arquivo** depois da
+        // correspondência de eixos do `ModelPlacement` — por isso o rótulo "Elevação Z" da
+        // interface (herdado do app Android) finalmente nomeia o eixo do próprio modelo: a
+        // elevação afasta o modelo da folha, na direção de quem olha.
         assertEquals(base.x, lifted.x, 1e-5f)
         assertEquals(base.z, lifted.z, 1e-5f)
         assertEquals(base.y + 0.5f, lifted.y, 1e-5f)
     }
 
     @Test
-    fun `o arrasto desloca o modelo no plano da figura`() {
+    fun `o arrasto desloca o modelo nos eixos do marcador, junto da ancoragem`() {
         val centered = ModelPlacement.worldMatrix(
             identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3.ZERO,
             elevationMeters = 0f,
@@ -121,42 +234,105 @@ class ModelPlacementTest {
         val dragged = ModelPlacement.worldMatrix(
             identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3.ZERO,
             elevationMeters = 0f,
-            offsetMeters = Vec3(0.2f, 0f, -0.1f),
+            offsetMeters = Vec3(0.2f, 0.1f, -0.1f),
         )
 
         val center = ModelPlacement.apply(centered, metrics.center)
         val moved = ModelPlacement.apply(dragged, metrics.center)
 
-        // O arrasto entra como deslocamento no PLANO — X (largura) e Z (altura NA imagem) — e
-        // não toca na normal (Y): arrastar nunca tira o modelo do papel (decisão 34).
+        // O deslocamento entra como translação nos eixos do marcador, somada à ancoragem: o X é a
+        // largura, o **Y é a normal** (o frente–trás do arrasto — decisão 36, e o eixo em que o
+        // **+Z do arquivo** sai da figura) e o Z a altura NA imagem. É a mesma conta da ancoragem, e
+        // é por isso que ela acompanha o tamanho do modelo.
         assertEquals(center.x + 0.2f, moved.x, 1e-5f)
+        assertEquals(center.y + 0.1f, moved.y, 1e-5f, "o Y é a normal: o frente–trás do arrasto")
         assertEquals(center.z - 0.1f, moved.z, 1e-5f)
-        assertEquals(center.y, moved.y, 1e-5f, "o arrasto é no plano: a normal não se mexe")
-
-        // E a base continua apoiada no plano: o arrasto não levanta nem afunda o modelo.
-        val base = ModelPlacement.apply(dragged, Vec3(-10f, 0f, -5f))
-        assertEquals(0f, base.y, 1e-5f)
     }
 
     @Test
-    fun `a rotacao dos sliders acontece no referencial do marcador`() {
-        val upright = ModelPlacement.worldMatrix(
+    fun `o arrasto nao gira com os cursores de rotacao`() {
+        // Quem arrasta move o modelo **sobre a figura**: o deslocamento é aplicado fora da rotação
+        // dos cursores (`local = T · R · S`), então girar o modelo não muda o eixo em que ele anda.
+        // Sem isso, um modelo girado sairia andando de lado ao arrastar.
+        val semGiro = ModelPlacement.worldMatrix(
             identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3.ZERO,
-            elevationMeters = 0f,
+            elevationMeters = 0f, offsetMeters = Vec3(0.2f, 0f, 0f),
         )
-        val laidDown = ModelPlacement.worldMatrix(
-            identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3(90f, 0f, 0f),
+        val comGiro = ModelPlacement.worldMatrix(
+            identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3(0f, 90f, 0f),
+            elevationMeters = 0f, offsetMeters = Vec3(0.2f, 0f, 0f),
+        )
+
+        // A posição do modelo no mundo depois do mesmo arrasto de 0,2 m na largura do marcador.
+        val andou = ModelPlacement.apply(semGiro, Vec3.ZERO)
+        val andouGirado = ModelPlacement.apply(comGiro, Vec3.ZERO)
+
+        assertEquals(andou.x, andouGirado.x, 1e-5f)
+        assertEquals(andou.y, andouGirado.y, 1e-5f)
+        assertEquals(andou.z, andouGirado.z, 1e-5f)
+    }
+
+    @Test
+    fun `a rotacao dos sliders acontece nos eixos do arquivo, os que o marcador adota`() {
+        fun comCursores(graus: Vec3) = ModelPlacement.worldMatrix(
+            identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = graus, elevationMeters = 0f,
+        )
+
+        // O slider X gira no **X do arquivo** (a largura da figura). Com 90° o "para cima" do modelo
+        // sai da imagem e cai na NORMAL: o modelo deita para dentro do plano, apoiado na face da
+        // frente. É também a leitura que explica a correspondência antiga: 90° no cursor X
+        // **desfazem** o −90° da orientação do app (é o "deitado de costas" da 1.0.7).
+        assertVector(
+            Vec3(0f, 0f, -1f),
+            direction(comCursores(Vec3.ZERO), Vec3(0f, 20f, 0f)),
+            message = "sem giro: em pé, com o 'para cima' na altura da imagem",
+        )
+        assertVector(
+            Vec3(0f, 1f, 0f),
+            direction(comCursores(Vec3(90f, 0f, 0f)), Vec3(0f, 20f, 0f)),
+            message = "90° em X: o 'para cima' caiu na normal",
+        )
+
+        // O slider Z gira em torno do **Z do arquivo** — o eixo que sai da folha (a normal). O
+        // "para cima" do modelo, que estava na imagem, roda para a largura da figura.
+        assertVector(
+            Vec3(-1f, 0f, 0f),
+            direction(comCursores(Vec3(0f, 0f, 90f)), Vec3(0f, 20f, 0f)),
+            message = "90° em Z: girou em torno do eixo que sai da folha",
+        )
+    }
+
+    @Test
+    fun `um arquivo exportado com o Z para cima fica de pe com menos 90 graus no cursor X`() {
+        // A correspondência do app supõe o arquivo glTF (+Y para cima, +Z para a frente). Um arquivo
+        // exportado com o **Z para cima** (vários CAD e o SketchUp) é o mesmo modelo girado 90° — e o
+        // painel resolve: com −90° no cursor X o "para cima" dele (o +Z) vai para a altura NA imagem,
+        // como o +Y do arquivo padrão.
+        val matrix = ModelPlacement.worldMatrix(
+            identityPose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3(-90f, 0f, 0f),
             elevationMeters = 0f,
         )
 
-        val topUpright = ModelPlacement.apply(upright, Vec3(0f, 20f, 0f))
-        val topLaidDown = ModelPlacement.apply(laidDown, Vec3(0f, 20f, 0f))
+        assertVector(
+            Vec3(0f, 0f, -1f),
+            direction(matrix, Vec3(0f, 0f, 5f)),
+            message = "o +Z deste arquivo tem de ir para a altura NA imagem",
+        )
+    }
 
-        // O X do slider gira no **X do marcador** (a largura da figura): o 90° deita o modelo
-        // na altura da imagem, e o topo deixa a normal — é o par de eixos que o usuário vê.
-        assertEquals(0.2f, topUpright.y, 1e-5f, "em pé: o topo sobe pela normal")
-        assertEquals(0f, topLaidDown.y, 1e-5f, "deitado: o topo sai da normal")
-        assertEquals(0.2f, topLaidDown.z, 1e-5f, "e vai para a altura NA imagem")
+    @Test
+    fun `a caixa orientada leva a altura do arquivo para a altura da imagem`() {
+        val placed = ModelPlacement.orientedBounds(metrics, ModelPlacement.MODEL_ORIENTATION)
+
+        // O centro gira (o meio da altura do arquivo, 10 unidades acima da base, sobe na imagem: o
+        // −Z do marcador) e a meia-extensão troca de eixo: no marcador, o "Y" da caixa passa a ser a
+        // **espessura** do arquivo (5) e o "Z" a **altura** dele (10).
+        assertEquals(0f, placed.center.x, 1e-5f)
+        assertEquals(0f, placed.center.y, 1e-5f, "o centro do arquivo cai no plano da figura")
+        assertEquals(-10f, placed.center.z, 1e-5f, "e sobe na imagem (−Z do marcador)")
+        assertEquals(10f, placed.halfExtent.x, 1e-5f)
+        assertEquals(5f, placed.halfExtent.y, 1e-5f, "a espessura do arquivo é o que sai do plano")
+        assertEquals(10f, placed.halfExtent.z, 1e-5f, "e a altura dele é a altura NA imagem")
     }
 
     @Test
@@ -171,11 +347,13 @@ class ModelPlacementTest {
             pose, metrics, sizeMeters = 0.2f, rotationDegrees = Vec3.ZERO, elevationMeters = 0f,
         )
 
-        // A translação da matriz é a posição do marcador: é o que faz o conteúdo
-        // "grudar" na figura impressa.
+        // A translação da matriz é a posição do marcador somada à **ancoragem**: com este modelo
+        // (base no y = 0 e espessura centrada no z), ela vale (0; +0,05; +0,10) — o **fundo** dele
+        // apoia no plano da figura (0,05 m = a meia espessura pela normal) e ele fica centrado na
+        // altura da imagem (0,10 m = a metade da altura do arquivo × a escala de 0,01 m/unidade).
         assertEquals(0.3f, matrix[12], 1e-5f)
-        assertEquals(-0.2f, matrix[13], 1e-5f)
-        assertEquals(-0.6f, matrix[14], 1e-5f)
+        assertEquals(-0.2f + 0.05f, matrix[13], 1e-5f)
+        assertEquals(-0.6f + 0.10f, matrix[14], 1e-5f)
     }
 
     @Test
@@ -212,50 +390,151 @@ class ModelPlacementTest {
     }
 
     @Test
-    fun `girar o marcador pela sua normal gira o modelo em torno de si, sem deita-lo`() {
-        // O referencial do marcador é o do ARCore — e o que o `solvePnP` produz a partir de
-        // `MarkerDetector.markerObjectPointsMat`: X = largura, **Y = NORMAL** (o eixo que sai
-        // do papel, com zero nas quatro quinas do objeto) e Z = altura NA imagem.
+    fun `girar o marcador pela normal gira o modelo no proprio eixo Z, sem deita-lo`() {
+        // A situação de campo: a folha girada na própria face (na mão, ou sobre a mesa). No
+        // referencial do marcador isso é girar em torno do eixo **Y** — a normal —, e no do arquivo
+        // é girar em torno do **Z** (o "nariz" do modelo: no `House.glb`, a face da porta), porque é
+        // ele que a correspondência de eixos do `ModelPlacement` põe na normal.
         //
-        // Girar a folha impressa sobre a mesa é, portanto, girar o marcador em torno do
-        // PRÓPRIO eixo Y. Se o modelo está de pé sobre o papel, o "para cima" dele está
-        // nesse mesmo eixo: girar a folha NÃO pode mudar a direção do "para cima" no mundo —
-        // o modelo gira em torno de si mesmo e continua apoiado na figura.
-        //
-        // Era este o defeito relatado em campo: com o "para cima" do modelo caindo dentro do
-        // plano (no eixo Z), girar a folha fazia o modelo girar em torno do eixo errado.
-        val normal = Vec3(0f, 1f, 0f)
-
+        // O que se cobra, em cada giro: a frente do modelo **não sai** da normal (ela é o eixo do
+        // giro) e o "para cima" acompanha a folha — ele é a **altura NA imagem** (−Z do marcador),
+        // que é justamente o que o giro muda. É o modelo girando junto, eixo por eixo.
         for (passo in 0..11) {
             val graus = passo * 30.0
+            val pose = spinAroundNormal(graus)
             val matrix = ModelPlacement.worldMatrix(
-                markerPose = spinAroundNormal(graus),
+                markerPose = pose,
                 metrics = metrics,
                 sizeMeters = 0.2f,
                 rotationDegrees = Vec3.ZERO,
                 elevationMeters = 0f,
             )
 
-            // Direção do "para cima" do arquivo (+Y) depois de todo o empilhamento.
-            val base = ModelPlacement.apply(matrix, Vec3(0f, 0f, 0f))
-            val top = ModelPlacement.apply(matrix, Vec3(0f, 20f, 0f))
-            val up = Vec3(top.x - base.x, top.y - base.y, top.z - base.z)
+            // Os eixos do marcador NO MUNDO são as **colunas** da rotação da pose (o `Pose` guarda a
+            // rotação em ordem de LINHA e a aplica como `mundo = R · ponto`): a 2ª coluna é a normal
+            // e a 3ª é a altura NA imagem.
+            val normal = Vec3(pose[0, 1].toFloat(), pose[1, 1].toFloat(), pose[2, 1].toFloat())
+            val alturaNaImagem = Vec3(
+                -pose[0, 2].toFloat(),
+                -pose[1, 2].toFloat(),
+                -pose[2, 2].toFloat(),
+            )
 
-            // O "para cima" continua sendo a normal em qualquer giro da folha: o modelo gira em
-            // torno de si mesmo (0,2 m de altura, o tamanho escolhido) e não deita.
-            assertEquals(0f, up.x, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
-            assertEquals(0.2f, up.y, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
-            assertEquals(0f, up.z, 1e-5f, "com a folha a $graus° o 'para cima' saiu da normal")
-
-            // E continua de pé na figura: o topo sobe 0,2 m pela normal, centrado no plano.
-            assertEquals(0f, top.x, 1e-5f)
-            assertEquals(0.2f, top.y, 1e-5f, "o topo do modelo sobe pela normal (Y do marcador)")
-            assertEquals(0f, top.z, 1e-5f)
+            assertVector(
+                normal,
+                direction(matrix, Vec3(0f, 0f, 5f)),
+                message = "com a folha a $graus° a frente saiu da normal",
+            )
+            assertVector(
+                alturaNaImagem,
+                direction(matrix, Vec3(0f, 20f, 0f)),
+                message = "com a folha a $graus° o 'para cima' não acompanhou a folha",
+            )
         }
 
         // A normal do marcador é a 2ª coluna da rotação da pose — o eixo pelo qual a folha gira.
         val pose = spinAroundNormal(0.0)
         assertEquals(1.0, pose[1, 1], 1e-6, "a coluna da normal da pose deveria ser +Y")
+    }
+
+
+    @Test
+    fun `com a folha apoiada na mesa o modelo fica deitado com a face para cima`() {
+        // A consequência da correspondência fixa, medida para não surpreender: com a folha
+        // **apoiada na mesa** a normal é (quase) a vertical do mundo, e é ela que a face do modelo
+        // adota — o modelo aparece **deitado com a face para cima** (no `House.glb`, a porta
+        // apontando para o teto), girando no plano da folha quando ela gira.
+        //
+        // É o preço de o modelo ser **colado à figura** — e não orientado pela vertical do mundo —, e
+        // é o inverso do caso de campo: a folha **de frente para a webcam**, que é o que a decisão
+        // 38 corrigiu (a folha na mesa era o único caso em que a correspondência de identidade, da
+        // 1.0.7, dava "em pé").
+        val pose = sheetOnTablePose(graus = 25f, giroDaFolha = 0.0)
+        val matrix = ModelPlacement.worldMatrix(
+            markerPose = pose,
+            metrics = metrics,
+            sizeMeters = 0.13f,
+            rotationDegrees = RenderScene.DEFAULT_ROTATION_DEGREES,
+            elevationMeters = 0f,
+        )
+
+        // Os eixos do marcador NO MUNDO (as colunas da rotação da pose): a normal da folha e a
+        // altura NA imagem (com o sinal trocado, porque o "para cima" da imagem é o −Z).
+        val normalDaFolha = Vec3(pose[0, 1].toFloat(), pose[1, 1].toFloat(), pose[2, 1].toFloat())
+        val alturaNaImagem = Vec3(
+            -pose[0, 2].toFloat(),
+            -pose[1, 2].toFloat(),
+            -pose[2, 2].toFloat(),
+        )
+
+        // A face do modelo (o +Z do arquivo) é a normal da folha — e, na mesa, essa normal aponta
+        // para CIMA: é a face do modelo que olha para o teto.
+        assertVector(normalDaFolha, direction(matrix, Vec3(0f, 0f, 5f)))
+        assertTrue(
+            normalDaFolha.y > 0.85f,
+            "com a folha apoiada na mesa a normal é (quase) a vertical do mundo: $normalDaFolha",
+        )
+
+        // E o "para cima" do modelo é a altura NA imagem da folha — que, com a folha na mesa, está
+        // DEITADA no plano da mesa (apontando para quem olha): o modelo está deitado.
+        assertVector(alturaNaImagem, direction(matrix, Vec3(0f, 20f, 0f)))
+        assertTrue(
+            kotlin.math.abs(alturaNaImagem.y) < 0.5f,
+            "com a folha apoiada na mesa o 'para cima' do modelo fica no plano da mesa: $alturaNaImagem",
+        )
+    }
+
+    /**
+     * Vetor do arquivo, em metros, depois de empilhada a matriz de um quadro — do ponto `(0, 0, 0)`
+     * do arquivo até [tip]. É a medida que serve para conferir direção **e** comprimento.
+     */
+    private fun segment(matrix: FloatArray, tip: Vec3): Vec3 {
+        val origin = ModelPlacement.apply(matrix, Vec3.ZERO)
+        val end = ModelPlacement.apply(matrix, tip)
+        return Vec3(end.x - origin.x, end.y - origin.y, end.z - origin.z)
+    }
+
+    /** Direção (unidade) de um eixo do arquivo no mundo: o que os testes de orientação comparam. */
+    private fun direction(matrix: FloatArray, tip: Vec3): Vec3 {
+        val vector = segment(matrix, tip)
+        val length = kotlin.math.sqrt(
+            vector.x * vector.x + vector.y * vector.y + vector.z * vector.z,
+        )
+        return Vec3(vector.x / length, vector.y / length, vector.z / length)
+    }
+
+    /** Confere um vetor componente a componente — as contas são de `Float`. */
+    private fun assertVector(
+        expected: Vec3,
+        actual: Vec3,
+        tolerance: Float = 1e-5f,
+        message: String = "",
+    ) {
+        assertEquals(expected.x, actual.x, tolerance, "$message (x): $actual")
+        assertEquals(expected.y, actual.y, tolerance, "$message (y): $actual")
+        assertEquals(expected.z, actual.z, tolerance, "$message (z): $actual")
+    }
+
+    /**
+     * Pose de uma folha **deitada na mesa**, a 0,6 m da câmera, vista por uma câmera [graus] abaixo
+     * da horizontal: a normal da folha (o +Y do marcador) fica quase na vertical do mundo e o
+     * "para baixo na imagem" (o +Z do marcador) aponta para quem olha. [giroDaFolha] é a folha
+     * girando **sobre a mesa**, em torno da própria normal.
+     */
+    private fun sheetOnTablePose(graus: Float, giroDaFolha: Double): Pose {
+        val matrix = ModelPlacement.multiply(
+            ModelPlacement.eulerRotation(Vec3(graus, 0f, 0f)),
+            ModelPlacement.eulerRotation(Vec3(0f, giroDaFolha.toFloat(), 0f)),
+        )
+        // `eulerRotation` é coluna-maior; a `Pose` guarda a rotação em ordem de LINHA.
+        return Pose(
+            rotation = doubleArrayOf(
+                matrix[0].toDouble(), matrix[4].toDouble(), matrix[8].toDouble(),
+                matrix[1].toDouble(), matrix[5].toDouble(), matrix[9].toDouble(),
+                matrix[2].toDouble(), matrix[6].toDouble(), matrix[10].toDouble(),
+            ),
+            translation = Vec3(0f, 0f, -0.6f),
+        )
     }
 
     /** Pose de um marcador que gira em torno da **sua normal** (o eixo Y do referencial dele). */

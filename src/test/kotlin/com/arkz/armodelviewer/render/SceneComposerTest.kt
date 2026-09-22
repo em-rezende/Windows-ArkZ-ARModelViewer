@@ -345,16 +345,17 @@ class SceneComposerTest {
             composer.setModel(model())
             composer.start()
 
-            // Arrasto dentro do limite: chega como está — e o arrasto anda no PLANO da figura
-            // (X = largura e Z = altura NA imagem); o Y é a normal e fica em zero (decisão 34).
-            composer.setOffsetMeters(Vec3(0.2f, 0f, -0.3f))
+            // Arrasto dentro do limite: chega como está nos dois eixos do arrasto — X (a largura
+            // da figura) e Y (a normal, isto é, o frente–trás). O Z, a "altura NA imagem", fica em
+            // zero: era ele que fazia o arrasto vertical subir e descer o modelo (decisão 36).
+            composer.setOffsetMeters(Vec3(0.2f, -0.1f, -0.3f))
             composer.submit(background(), listOf(marker(TrackingState.TRACKING)))
             await { renderer.scenes.isNotEmpty() }
 
             val scene = assertNotNull(renderer.scenes.last())
             assertEquals(0.2f, scene.offsetMeters.x, 1e-6f)
-            assertEquals(-0.3f, scene.offsetMeters.z, 1e-6f)
-            assertEquals(0f, scene.offsetMeters.y, 1e-6f, "o arrasto é no plano da figura")
+            assertEquals(-0.1f, scene.offsetMeters.y, 1e-6f, "o arrasto vertical anda no frente–trás")
+            assertEquals(0f, scene.offsetMeters.z, 1e-6f, "o arrasto não mexe na altura NA imagem")
 
             // Arrasto além do limite: o modelo não pode sair de perto da figura.
             composer.setOffsetMeters(Vec3(9f, 9f, 5f))
@@ -363,8 +364,8 @@ class SceneComposerTest {
 
             val clamped = assertNotNull(renderer.scenes.last())
             assertEquals(InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.x, 1e-6f)
-            assertEquals(InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.z, 1e-6f)
-            assertEquals(0f, clamped.offsetMeters.y, 1e-6f)
+            assertEquals(InteractiveInput.MAX_PAN_METERS, clamped.offsetMeters.y, 1e-6f)
+            assertEquals(0f, clamped.offsetMeters.z, 1e-6f)
         } finally {
             composer.close()
         }
@@ -421,19 +422,22 @@ class SceneComposerTest {
     }
 
     @Test
-    fun `o modelo carrega com a rotacao inicial de 90 graus em X`() {
-        // Os arquivos de CAD/SketchUp têm o **Z para cima**: com a rotação inicial em zero o
-        // modelo aparecia DEITADO sobre a figura, e o usuário tinha de girar o cursor X à mão
-        // em cada modelo carregado. O valor inicial é o mesmo do app Android para esses
-        // arquivos, e o "Redefinir" volta para ele (veja
-        // [RenderScene.DEFAULT_ROTATION_DEGREES]).
+    fun `os cursores de rotacao abrem como o modelo carrega`() {
+        // **Zero** — e não os 90° em X da 1.0.5/1.0.6: com a correspondência de eixos da decisão 38
+        // (o plano XY do arquivo é o plano da figura e o +Z do arquivo é a normal), o modelo carrega
+        // **de pé e com a face virada para quem olha** já com os cursores em zero — e é com eles em
+        // zero que girar a folha impressa gira o modelo no eixo correspondente (o +Z do arquivo). O
+        // 90° em X era o *apoio* que a 1.0.5 embutiu supondo os arquivos Z-up, e que **deitava** o
+        // modelo no plano da folha — as medições estão nas decisões 37 e 38 do roadmap.
+        //
+        // O "Redefinir" volta para o mesmo valor (veja [RenderScene.DEFAULT_ROTATION_DEGREES]).
         val composer = SceneComposer(rendererFactory = { FakeRenderer() }, onLog = {})
 
         try {
             assertEquals(
-                Vec3(90f, 0f, 0f),
+                Vec3.ZERO,
                 composer.rotationDegrees.value,
-                "o cursor de rotação deve abrir em 90° no X",
+                "os cursores devem abrir como o modelo carrega: em zero",
             )
             assertEquals(
                 RenderScene.DEFAULT_ROTATION_DEGREES,

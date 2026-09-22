@@ -186,7 +186,7 @@ class FilamentRenderer(
 
     /**
      * Quadrilátero unitário no plano XY, centrado na origem, com as coordenadas de
-     * textura na convenção do **vídeo** (v = 0 na linha de cima da imagem).
+     * textura que põem a **linha de cima da imagem no topo do mundo** ([QUAD_VERTICES]).
      *
      * Os vértices estão em ordem anti-horária vista da câmera (que está em +Z olhando
      * para −Z), e o descarte de faces está desligado de todo modo.
@@ -421,6 +421,15 @@ class FilamentRenderer(
      * retorno de chamada do descritor. O `flushAndWait` processa a fila de comandos do
      * motor até a cópia terminar (sem ele o retorno de chamada só aconteceria no próximo
      * quadro — e a captura de tela sairia atrasada ou vazia).
+     *
+     * **A leitura vai como o motor a devolve, sem inverter linhas** (decisão 39). Neste
+     * backend (Vulkan, medido) o `readPixels` já entrega o quadro **de cima para baixo** —
+     * o mesmo sentido do Compose —, e inverter aqui era o defeito que fazia o **modelo**
+     * aparecer **de cabeça para baixo** em relação ao vídeo: as duas inversões (esta e a das
+     * coordenadas de textura do plano de fundo, em [QUAD_VERTICES]) se cancelavam **só para o
+     * vídeo**, e o modelo — que é ancorado no mundo — ficava espelhado. Enquanto o modelo
+     * carregava deitado (até a 1.0.7) os dois ficavam no plano horizontal e o espelho não
+     * aparecia; com o modelo de pé (decisão 38) ele ficou óbvio.
      */
     private fun readBack(): SceneFrame? {
         val pixels = ByteArray(width * height * 4)
@@ -445,9 +454,7 @@ class FilamentRenderer(
             return null
         }
 
-        // O Filament devolve as linhas de baixo para cima (convenção do OpenGL) e o
-        // Compose desenha de cima para baixo.
-        return SceneFrame(pixels, width, height).flippedVertically()
+        return SceneFrame(pixels, width, height)
     }
 
     /** Solta o modelo carregado (entidades, recursos e a cópia dos bytes). */
@@ -586,14 +593,20 @@ class FilamentRenderer(
 
         /**
          * Quadrilátero unitário do plano de fundo: posição (x, y, z) e textura (u, v) por
-         * vértice, **v = 0 na linha de cima da imagem** — a mesma ordem dos pixels do
-         * quadro da câmera (de cima para baixo).
+         * vértice, com a **linha de cima da imagem no topo do mundo** (v = 1 lá).
+         *
+         * O `v` do Filament conta a textura **de baixo para cima** — a linha de cima do quadro
+         * da câmera (a primeira dos pixels, de cima para baixo) é a **última** da textura —, e é
+         * por isso que ela leva v = 1 aqui, no vértice de cima do quad. Com a leitura **sem
+         * inversão de linhas** ([readBack]), este é o mapeamento que mantém **o vídeo e o modelo
+         * no mesmo sentido**: os dois aparecem "de pé" no quadro, e um marcador na metade de cima
+         * da imagem recebe o modelo na metade de cima (decisão 39).
          */
         private val QUAD_VERTICES = floatArrayOf(
-            -0.5f, -0.5f, 0f, 0f, 1f,
-            0.5f, -0.5f, 0f, 1f, 1f,
-            0.5f, 0.5f, 0f, 1f, 0f,
-            -0.5f, 0.5f, 0f, 0f, 0f,
+            -0.5f, -0.5f, 0f, 0f, 0f,
+            0.5f, -0.5f, 0f, 1f, 0f,
+            0.5f, 0.5f, 0f, 1f, 1f,
+            -0.5f, 0.5f, 0f, 0f, 1f,
         )
 
         private val QUAD_INDICES = shortArrayOf(0, 1, 2, 0, 2, 3)

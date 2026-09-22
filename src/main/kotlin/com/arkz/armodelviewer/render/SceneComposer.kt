@@ -120,13 +120,13 @@ class SceneComposer(
     /** Tamanho atual do modelo (maior dimensão, em metros). */
     val sizeMeters: StateFlow<Float> = _sizeMeters.asStateFlow()
 
-    /** Rotação atual do painel, em graus, nos eixos do referencial do marcador. */
+    /** Rotação atual do painel, em graus, nos eixos do **arquivo** (veja `setRotation`). */
     val rotationDegrees: StateFlow<Vec3> = _rotationDegrees.asStateFlow()
 
     /** "Elevação Z" atual, em metros. */
     val elevationMeters: StateFlow<Float> = _elevationMeters.asStateFlow()
 
-    /** Deslocamento atual no plano da figura (o arrasto do "modo livre"), em metros. */
+    /** Deslocamento atual do arrasto (o "modo livre"), em metros, no referencial do marcador. */
     val offsetMeters: StateFlow<Vec3> = _offsetMeters.asStateFlow()
 
     private var requestedWidth = 0
@@ -189,7 +189,10 @@ class SceneComposer(
         )
     }
 
-    /** Rotação do painel de ajustes, em graus, nos eixos do referencial do marcador. */
+    /**
+     * Rotação do painel de ajustes, em graus, nos eixos do **arquivo** (X = largura, Y = "para
+     * cima", Z = o "frente" — o eixo que sai da folha, depois da orientação do `ModelPlacement`).
+     */
     fun setRotation(degrees: Vec3) {
         _rotationDegrees.value = degrees
     }
@@ -200,18 +203,19 @@ class SceneComposer(
     }
 
     /**
-     * Deslocamento no **plano da figura** (o arrasto do "modo livre"), em metros.
+     * Deslocamento do **arrasto** (o "modo livre"), em metros, no referencial do marcador.
      *
-     * **X (largura)** e **Z (altura NA imagem)** são limitados à faixa do arrasto
+     * **X (largura)** e **Y (a normal, isto é, o frente–trás)** são limitados à faixa do arrasto
      * ([InteractiveInput.MAX_PAN_METERS]): dá para pôr o modelo ao lado ou à frente da figura,
-     * mas não para perdê-lo de vista. O **Y é a normal** do marcador e fica sempre em **zero**:
-     * o arrasto nunca tira o modelo do papel (decisão 34).
+     * mas não para perdê-lo de vista. O **Z (a "altura NA imagem") fica em zero**: era ele que
+     * fazia o arrasto vertical subir e descer o modelo pelo mundo em vez de movê-lo para a frente
+     * e para trás — a medição e a **decisão 36** estão no `InteractiveInput`.
      */
     fun setOffsetMeters(offset: Vec3) {
         _offsetMeters.value = Vec3(
             x = offset.x.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
-            y = 0f,
-            z = offset.z.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
+            y = offset.y.coerceIn(-InteractiveInput.MAX_PAN_METERS, InteractiveInput.MAX_PAN_METERS),
+            z = 0f,
         )
     }
 

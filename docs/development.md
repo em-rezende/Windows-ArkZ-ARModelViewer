@@ -6,7 +6,8 @@
 |---|---|---|
 | JDK | **25** (toolchain) | O Filament no desktop usa FFM (Project Panama), que exige **Java 22+**. O build declara `jvmToolchain(25)` e emite bytecode 22. O Gradle baixa o JDK sozinho (`foojay-resolver-convention`) e o daemon pede a versão em `gradle/gradle-daemon-jvm.properties`. |
 | Gradle | 9.7.1 | Já vem pelo wrapper (`gradlew.bat`). |
-| WiX Toolset | 3.14+ (ou WiX 4/5) | Só para gerar o `.msi` (`gradlew.bat packageMsi`). O `assemble`/`run`/`test` não precisam dele. |
+| WiX Toolset | — | **Nada a instalar:** o plugin do Compose baixa o WiX 3.11 sozinho na primeira vez que o `.msi` é gerado (pasta `build/wix311`) e entrega o caminho ao `jpackage`. Medido: `gradlew packageMsi` funciona numa máquina **sem WiX nenhum**, e sem ele no `PATH`. |
+| Visual C++ Redistributable 2015-2022 | — | Só para quem **instala pelo `.msi`**: o `.msi` monta a própria imagem e **não** leva as três DLLs que o `createDistributable` copia ao lado do `.exe` do portátil (medido: **227** arquivos no `.msi` contra **230** na imagem portátil). O pacote portátil é autossuficiente. |
 | Webcam | integrada ou USB | Necessária apenas para o app em execução (etapas 2+). |
 
 > **Bibliotecas nativas:** o Filament, o OpenCV, o OpenBLAS e o LWJGL são baixados
@@ -51,7 +52,7 @@
 # Diagnóstico do carregamento de modelo (Assimp) — converte de verdade e relata
 .\gradlew.bat modelCheck -Pmodelo="3d_models/ArkZ_logo.obj"
 
-# Instalador .msi (precisa do WiX)
+# Instalador .msi (o WiX vem na primeira vez)
 .\gradlew.bat packageMsi
 ```
 
@@ -109,12 +110,12 @@ git clone --depth 1 https://github.com/em-rezende/Android-ArkZ-ARModelViewer.git
 | `run` | Abre a janela do aplicativo. |
 | `modelCheck` | Diagnóstico do carregamento de modelo (Assimp): use `-Pmodelo="caminho"`. Grava `logs/diagnostico-modelo.txt`. |
 | `createDistributable` | Monta a **imagem portátil** (executável + runtime + nativos) em `build/compose/binaries/main/app/` e copia as DLLs do Visual C++ ao lado do `.exe`. |
-| `packageMsi` | Gera o instalador (exige WiX). |
+| `packageMsi` | Gera o instalador em `build/compose/binaries/main/msi/` — **não** precisa do WiX instalado (o plugin baixa o 3.11 sozinho): atalho no menu Iniciar, desinstalador e `upgradeUuid` fixo. **Ressalva medida:** o `.msi` monta a própria imagem e **não** leva as três DLLs do Visual C++ que o `createDistributable` copia ao lado do `.exe` (230 arquivos na imagem portátil contra 227 no `.msi`), então a máquina de destino precisa do *Redistributable* — o caminho do conserto é `appResourcesRootDir` mais `AddDllDirectory` na abertura do app. |
 
 ## Publicar no GitHub
 
-O repositório é <https://github.com/em-rezende/Windows-ArkZ-ARModelViewer> e a primeira
-versão publicada é a **1.0.0**. O que o repositório carrega, além do código:
+O repositório é <https://github.com/em-rezende/Windows-ArkZ-ARModelViewer>; a última versão
+publicada é a **1.0.7**, a primeira com instalador `.msi`. O que o repositório carrega, além do código:
 
 | Arquivo | Para que serve |
 |---|---|
@@ -125,32 +126,34 @@ versão publicada é a **1.0.0**. O que o repositório carrega, além do código
 | `.gitattributes` | Fim de linha: LF no repositório, CRLF nos `.bat`/`.ps1` e os binários (modelos, ícones, `.exe`) intocados. Sem ele, um `.stl`/`.ply` binário poderia ser corrompido pela conversão. |
 
 ```powershell
-# 1. Repositório local
-git init -b main
+# 1. Fechar a versão (a versão vive no build.gradle.kts e no CHANGELOG.md)
+.\gradlew.bat cleanTest test            # a suíte toda
+.\gradlew.bat createDistributable       # pacote portátil (autossuficiente)
+.\gradlew.bat packageMsi                # instalador .msi (não precisa do WiX instalado)
+
+# 2. Enviar para o GitHub
 git add -A
-git commit -m "ArkZ ARModelViewer Desktop 1.0.0: primeira versão pública"
+git commit -m "ArkZ ARModelViewer Desktop 1.0.7: instalador Windows e o modelo em pé"
+git push origin main
 
-# 2. Enviar para o GitHub (o remoto precisa existir: gh repo create, ou pela interface)
-git remote add origin https://github.com/em-rezende/Windows-ArkZ-ARModelViewer.git
-git push -u origin main
+# 3. Marcar a versão e publicar a release com as notas do CHANGELOG
+git tag -a v1.0.7 -m "ArkZ ARModelViewer Desktop 1.0.7"
+git push origin v1.0.7
+gh release create v1.0.7 --title "1.0.7" --notes-file CHANGELOG.md
 
-# 3. Release com as notas do CHANGELOG
-git tag -a v1.0.0 -m "ArkZ ARModelViewer Desktop 1.0.0"
-git push origin v1.0.0
-gh release create v1.0.0 --title "1.0.0" --notes-file CHANGELOG.md
+# 4. Anexar o instalador e o pacote portátil à release
+gh release upload v1.0.7 "build\compose\binaries\main\msi\ArkZ ARModelViewer-1.0.7.msi"
+Compress-Archive -Path "build\compose\binaries\main\app\ArkZ ARModelViewer" `
+                 -DestinationPath "dist\ArkZ-ARModelViewer-1.0.7-portatil.zip"
+gh release upload v1.0.7 "dist\ArkZ-ARModelViewer-1.0.7-portatil.zip"
 ```
 
-> O pacote portátil **não** entra no repositório (o `.gitignore` exclui `build/`, `dist/`,
-> `*.zip` e `*.exe`). Para anexá-lo a uma release:
+> O pacote portátil e o `.msi` **não** entram no repositório (o `.gitignore` exclui `build/`,
+> `dist/`, `*.zip`, `*.msi` e `*.exe`). Os dois são anexados à release — o passo 4 acima —, e o
+> `.msi` é o que a maioria dos usuários baixa.
 >
-> ```powershell
-> Compress-Archive -Path "build\compose\binaries\main\app\ArkZ ARModelViewer" `
->                  -DestinationPath "dist\ArkZ-ARModelViewer-1.0.0-portatil.zip"
-> gh release upload v1.0.0 "dist\ArkZ-ARModelViewer-1.0.0-portatil.zip"
-> ```
->
-> São cerca de **250 MB** compactados: vale mais como conveniência (o usuário final não
-> instala JDK) do que como obrigação da release.
+> Os dois pacotes saem com **190 MB** (o `.msi`) e **189 MB** (o portátil comprimido, de uma pasta de
+> 258 MB): vale mais como conveniência (o usuário final não instala JDK) do que como obrigação da release.
 
 ## Onde o app grava arquivos
 
@@ -165,3 +168,31 @@ gh release create v1.0.0 --title "1.0.0" --notes-file CHANGELOG.md
 
 Os mesmos conceitos do app Android (galeria, `SharedPreferences`, `filesDir`), com
 os equivalentes do Windows — a convenção está descrita em `docs/architecture.md`.
+
+## Arquivamento e manutenção futura
+
+O projeto está **completo e publicado**: as etapas 0 a 9 do roadmap estão fechadas, a versão em
+vigor é a **1.0.7** (tag `v1.0.7`) e os dois pacotes estão anexados à
+[release](https://github.com/em-rezende/Windows-ArkZ-ARModelViewer/releases/tag/v1.0.7).
+
+Para retomar o trabalho a partir de um clone novo (o wrapper do Gradle **está** versionado, então
+`gradlew.bat` funciona direto):
+
+```powershell
+.\gradlew.bat test              # a suíte toda — na primeira vez baixa o JDK 25 e as dependências
+.\gradlew.bat run               # abre o app para conferir (webcam, marcador, modelo)
+.\gradlew.bat packageMsi        # reconstrói o instalador (o WiX vem na primeira vez)
+```
+
+| O quê | Pode apagar? |
+|---|---|
+| `build/` | **Sim** — o Gradle regenera tudo (imagem portátil, `.msi`, WiX baixado, relatórios da suíte). |
+| `.gradle/` e `.kotlin/` | **Sim** — caches locais de build. |
+| `dist/` | **Sim** — as duas cópias locais (o `.msi` e o portátil zipado) já estão na release; o `.gitignore` já o exclui do repositório. |
+| `tools/` | **Não** — são os scripts de apoio (i18n, câmeras, UTF-8 BOM), descritos em *Scripts de apoio*. |
+| `assets/` | **Não** — são as três capturas de tela usadas pelo README. |
+| `3d_models/` | **Não** — os modelos de exemplo (é o `House.glb` das capturas). |
+
+Pendência conhecida, já registrada na etapa 8 do roadmap: o `.msi` não leva as três DLLs do Visual C++
+que o pacote portátil leva ao lado do `.exe` — o conserto é `appResourcesRootDir` mais
+`AddDllDirectory` na abertura do app, sem tocar no código de renderização.

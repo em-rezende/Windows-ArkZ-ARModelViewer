@@ -13,6 +13,7 @@ package com.arkz.armodelviewer.ar
 import com.arkz.armodelviewer.camera.toGrayBytes
 import com.arkz.armodelviewer.markers.MarkerCatalog
 import com.arkz.armodelviewer.markers.MarkerDefinition
+import com.arkz.armodelviewer.model.Vec3
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.indexer.UByteIndexer
 import org.bytedeco.opencv.global.opencv_core.BORDER_TRANSPARENT
@@ -52,6 +53,17 @@ class MarkerDetectorTest {
         Vec2(530f, 60f),
         Vec2(520f, 440f),
         Vec2(100f, 420f),
+    )
+
+    /**
+     * A mesma figura **de frente** para a câmera — o "impresso e virado para ele" do relato em
+     * campo, que é o caso em que o Z do marcador cai no eixo vertical do mundo (decisão 36).
+     */
+    private val frenteQuad = listOf(
+        Vec2(120f, 60f),
+        Vec2(520f, 80f),
+        Vec2(510f, 440f),
+        Vec2(130f, 420f),
     )
 
     private val marker: MarkerDefinition
@@ -120,6 +132,45 @@ class MarkerDetectorTest {
             )
 
             assertTrue(pose.isRotationOrthonormal(1e-3), "a rotação deveria ser ortonormal")
+        }
+    }
+
+    @Test
+    fun `de frente para a camera a pose entrega a normal no Y e a altura na imagem no Z`() {
+        // A medição que fixou a decisão 36 (a correção do arrasto vertical), e o que separa
+        // "o código *pretende* andar no plano" de "o código anda no plano". O referencial do
+        // marcador é o do ARCore — X = largura, Y = NORMAL, Z = altura NA imagem — e é o que o
+        // `solvePnP` produz a partir das quatro quinas de `markerObjectPointsMat` (nelas o Y é
+        // zero). Aqui a medição é feita com o detector de verdade, num quadro sintetizado.
+        //
+        // Com a figura **de frente** para a câmera, as três colunas da rotação da pose no
+        // referencial do mundo (X para a direita, Y para cima, câmera olhando para −Z) são:
+        // a largura para a direita, a normal para a câmera e a "altura NA imagem" para BAIXO no
+        // mundo — e é esta última que explica o relato: escrever o arrasto vertical no Z subia e
+        // descia o modelo, em vez de levá-lo para a frente e para trás (o Y, a normal).
+        detector().use { detector ->
+            val pose = detector.detect(renderWarped(marker.image, frenteQuad)).single().centerPose
+
+            fun coluna(indice: Int): Vec3 = Vec3(
+                pose[0, indice].toFloat(),
+                pose[1, indice].toFloat(),
+                pose[2, indice].toFloat(),
+            )
+
+            val largura = coluna(0)
+            val normal = coluna(1)
+            val alturaNaImagem = coluna(2)
+
+            assertTrue(largura.x > 0.9f, "o X do marcador deveria ser a largura: $largura")
+            assertTrue(
+                normal.z > 0.8f,
+                "o Y do marcador deveria ser a normal (para a câmera): $normal",
+            )
+            assertTrue(
+                -alturaNaImagem.y > 0.8f,
+                "o Z do marcador deveria ser a altura NA imagem (para baixo no mundo): " +
+                    "$alturaNaImagem",
+            )
         }
     }
 

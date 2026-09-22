@@ -154,8 +154,10 @@ class RenderSceneTest {
 
         val flipped = frame.flippedVertically()
 
-        // O `readPixels` do Filament devolve de baixo para cima; o Compose desenha de cima
-        // para baixo. Este teste é o que garante que o quadro não sai de cabeça para baixo.
+        // A inversão de linhas é uma ferramenta da convenção do quadro (o Compose desenha de cima
+        // para baixo). O renderizador do Filament **não** a usa: ele entrega o quadro como o motor
+        // devolve — de cima para baixo neste backend (decisão 39) —, e é por isso que o vídeo e o
+        // modelo ficam no mesmo sentido.
         val topRow = flipped.rgba.copyOfRange(0, frame.rowBytes)
         val originalBottomRow = frame.rgba.copyOfRange(frame.rowBytes, 2 * frame.rowBytes)
         assertTrue(topRow.contentEquals(originalBottomRow))

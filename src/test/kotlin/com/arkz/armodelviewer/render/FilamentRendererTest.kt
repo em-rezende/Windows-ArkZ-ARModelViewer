@@ -39,6 +39,7 @@ import kotlin.test.assertTrue
  * |---|---|
  * | textura da câmera | vídeo preto, ou vermelho e azul trocados |
  * | coordenadas de textura e leitura | **vídeo de cabeça para baixo** |
+ * | leitura **e** textura (não uma só) | **modelo espelhado na vertical**: o vídeo "certo" e o modelo de cabeça para baixo — o defeito da decisão 39 |
  * | tamanho do plano de fundo | faixa preta sobrando ou vídeo cortado |
  * | carga do modelo (gltfio) | modelo não aparece |
  * | matriz de ancoragem | modelo aparece longe do marcador |
@@ -82,59 +83,85 @@ class FilamentRendererTest {
     fun `o modelo aparece ancorado no marcador e some sem rastreio`() {
         val renderer = newRenderer(96, 96)
         try {
-            val model = prepareLogoModel()
             val background = solidFrame(96, 96, red = 40, green = 40, blue = 40)
+            val marker = markerOf(TrackingState.TRACKING)
 
-            // Em pé (a rotação padrão agora é "em pé"): o logo é uma chapa fina e fica de
-            // fio para a câmera. Ele tem de APARECER, mesmo que com poucos pixels.
-            val standing = assertNotNull(
-                renderer.render(
-                    RenderScene(
-                        background = background,
-                        marker = markerOf(TrackingState.TRACKING),
-                        model = model,
-                    ),
-                ),
-                "o quadro com o modelo em pé tem de sair",
-            )
-            val standingPainted = countPaintedPixels(standing, background)
-            assertTrue(
-                standingPainted > 0,
-                "o modelo em pé aparece de fio, mas tem de desenhar ALGO: $standingPainted",
-            )
-
-            // Deitado (90° em X, como o usuário faz para expor a face), a chapa enche a
-            // área central — é o caso que mede a ancoragem, a luz e a projeção.
+            // A **casa de referência** (`House.glb`, re-exportado do Blender em **+Y para cima**: o
+            // telhado no topo do Y e o cubo verde-amarelo no alto da casa), com os cursores em
+            // zero. Com a correspondência de eixos do `ModelPlacement` (decisão 38) ela aparece
+            // **de pé**, preenchendo a área central — é o quadro que mede a ancoragem, a luz e a
+            // projeção.
+            val house = prepareHouseModel()
             val facing = assertNotNull(
                 renderer.render(
                     RenderScene(
                         background = background,
-                        marker = markerOf(TrackingState.TRACKING),
-                        model = model,
-                        rotationDegrees = Vec3(90f, 0f, 0f),
+                        marker = marker,
+                        model = house,
                     ),
                 ),
-                "o quadro com a face do modelo tem de sair",
+                "o quadro com a casa de frente tem de sair",
             )
 
             val painted = countPaintedPixels(facing, background)
             assertTrue(
                 painted > 20,
-                "a face do modelo tem de aparecer sobre o fundo (pixels desenhados: $painted)",
+                "o modelo tem de aparecer sobre o fundo (pixels desenhados: $painted)",
             )
             assertTrue(
                 brightestChannel(facing) > 40 + 25,
                 "o modelo tem de estar ILUMINADO (maior canal: ${brightestChannel(facing)})",
             )
 
-            // O mesmo modelo, com o marcador apenas PAUSADO: nada pode ser desenhado.
+            // E a casa tem de estar **de pé**: o **cubo verde-amarelo do telhado** — a única parte
+            // colorida da metade de cima da casa — tem de aparecer **ACIMA** do centro do modelo.
+            // Com o quadro lido invertido (o defeito da decisão 39) ele aparecia abaixo, como o
+            // teste em campo mostrou ("de cabeça para baixo"). A **porta vermelha** fazia esta
+            // medida até o `House.glb` ser re-exportado com a porta na face do X, fora do campo da
+            // câmera de frente; quem mede a vertical agora é o cubo (medido: cubo na linha 37,0
+            // contra 47,5 do modelo, num quadro de 96 × 96).
+            val cubeCentroid = assertNotNull(
+                centroidOf(facing, background) { r, g, b -> g > b + 20 && r > b + 20 },
+                "o cubo do telhado (verde e amarelo) tem de aparecer no quadro",
+            )
+            val modelCentroid = assertNotNull(centroidOf(facing, background))
+            assertTrue(
+                cubeCentroid.second < modelCentroid.second - 3.0,
+                "o cubo do telhado tem de ficar ACIMA do centro do modelo (cubo em ${cubeCentroid.second}, " +
+                    "modelo em ${modelCentroid.second} linhas)",
+            )
+
+            // **Chapa fina, e o caminho da conversão:** o `.stl` do logotipo do repositório (o
+            // Assimp o converte para GLB) tem a espessura no **Y** — com a correspondência do app,
+            // que supõe o +Y para cima, ele fica de perfil. Com 90° no cursor **X** ele mostra a
+            // face e tem de desenhar ALGO: é este o caso que pega um modelo que "carrega e não
+            // aparece" (o defeito de campo da primeira versão).
+            val plate = prepareLogoModel()
+            val plateFacing = assertNotNull(
+                renderer.render(
+                    RenderScene(
+                        background = background,
+                        marker = marker,
+                        model = plate,
+                        rotationDegrees = Vec3(90f, 0f, 0f),
+                    ),
+                ),
+                "o quadro com a chapa de face tem de sair",
+            )
+            val platePainted = countPaintedPixels(plateFacing, background)
+            assertTrue(
+                platePainted > 0,
+                "a chapa de face aparece com poucos pixels, mas tem de desenhar ALGO: $platePainted",
+            )
+
+            // A mesma casa, com o marcador apenas PAUSADO: nada pode ser desenhado (e o caso é o do
+            // modelo **de frente**, o mais visível — um defeito aqui apareceria na hora).
             val paused = assertNotNull(
                 renderer.render(
                     RenderScene(
                         background = background,
                         marker = markerOf(TrackingState.PAUSED),
-                        model = model,
-                        rotationDegrees = Vec3(90f, 0f, 0f),
+                        model = house,
                     ),
                 ),
                 "o quadro sem rastreio tem de sair",
@@ -144,6 +171,68 @@ class FilamentRendererTest {
                 0,
                 countPaintedPixels(paused, background),
                 "sem rastreio o modelo não pode aparecer no quadro",
+            )
+        } finally {
+            renderer.close()
+        }
+    }
+
+    @Test
+    fun `os eixos do marcador caem no quadro do mesmo lado que o video mostra`() {
+        // O defeito que este teste guarda (decisão 39): o quadro era lido **invertido** e as
+        // coordenadas de textura do plano de fundo compensavam a inversão — o **vídeo** aparecia
+        // certo e o **modelo**, ancorado no mundo, aparecia **espelhado na vertical** (de cabeça
+        // para baixo). Com a leitura como o motor entrega, os dois ficam no mesmo sentido, e é o
+        // que se mede aqui, com deslocamentos conhecidos nos eixos DO MARCADOR: o **X** (a largura)
+        // leva o modelo para a DIREITA e o **Z** (a "altura NA imagem") o leva para BAIXO.
+        val renderer = newRenderer(96, 96)
+        try {
+            val background = solidFrame(96, 96, red = 40, green = 40, blue = 40)
+            val model = prepareHouseModel()
+            val marker = markerOf(TrackingState.TRACKING)
+
+            fun quadro(offset: Vec3): SceneFrame = assertNotNull(
+                renderer.render(
+                    RenderScene(
+                        background = background,
+                        marker = marker,
+                        model = model,
+                        offsetMeters = offset,
+                    ),
+                ),
+                "o quadro com deslocamento $offset tem de sair",
+            )
+
+            fun centro(frame: SceneFrame): Pair<Double, Double> = assertNotNull(
+                centroidOf(frame, background),
+                "o modelo tem de aparecer no quadro",
+            )
+
+            val semDeslocamento = quadro(Vec3.ZERO)
+            val paraADireita = quadro(Vec3(0.1f, 0f, 0f))
+            val paraBaixo = quadro(Vec3(0f, 0f, 0.1f))
+            val paraAFrente = quadro(Vec3(0f, 0.1f, 0f))
+
+            assertTrue(
+                centro(paraADireita).first > centro(semDeslocamento).first + 10.0,
+                "o X do marcador tem de levar o modelo para a DIREITA: " +
+                    "${centro(semDeslocamento)} → ${centro(paraADireita)}",
+            )
+            assertTrue(
+                centro(paraBaixo).second > centro(semDeslocamento).second + 10.0,
+                "o Z do marcador tem de levar o modelo para BAIXO: " +
+                    "${centro(semDeslocamento)} → ${centro(paraBaixo)}",
+            )
+
+            // E o Y do marcador (a NORMAL) é o frente–trás: um deslocamento nele **aproxima** o
+            // modelo — mais pixels desenhados, porque a projeção é maior. É o sentido que a decisão
+            // 36 fixou para o arrasto ("para baixo traz o modelo para a frente").
+            val pixelsBase = countPaintedPixels(semDeslocamento, background)
+            val pixelsFrente = countPaintedPixels(paraAFrente, background)
+            assertTrue(
+                pixelsFrente > pixelsBase + 100,
+                "o Y do marcador tem de trazer o modelo PARA A FRENTE (pixels: $pixelsBase → " +
+                    "$pixelsFrente)",
             )
         } finally {
             renderer.close()
@@ -207,16 +296,21 @@ class FilamentRendererTest {
      * documenta): **+X** é a largura da imagem, **+Y** é a **normal** (sai do plano do
      * marcador, na direção de quem olha) e **+Z** é a altura NA imagem. Um marcador de
      * frente para a câmera, portanto, tem a rotação que leva o +Y dele ao **+Z** do mundo
-     * (para fora da tela, em direção à câmera) e o +Z dele ao −Y do mundo:
+     * (para fora da tela, em direção à câmera) e o +Z dele ao −Y do mundo — são as
+     * **colunas** da matriz (o `Pose` guarda a rotação em ordem de linha e a aplica como
+     * `mundo = R · ponto`):
      *
      * ```
      * X → (1, 0, 0)      Y → (0, 0, 1)      Z → (0, −1, 0)
      * ```
      *
      * Com a rotação de identidade, o marcador ficaria **de perfil** para a câmera (o plano
-     * dele contém a direção de visão) e o modelo — que fica deitado no plano do marcador —
-     * apareceria de fio, com zero pixel. Foi exatamente esse o defeito que este teste
-     * pegou: a pose precisa ser fisicamente possível.
+     * dele contém a direção de visão) e o modelo apareceria de fio, com zero pixel. Foi
+     * exatamente esse o defeito que este teste pegou: a pose precisa ser fisicamente possível.
+     *
+     * Com esta pose o modelo carrega **de pé e de frente** para a câmera (o plano XY do arquivo
+     * é o plano da figura, e o +Z do arquivo — a face — é a normal): é a situação dos quadros
+     * deste teste, e é a mesma do relato de campo, com o marcador virado para a webcam.
      */
     private fun markerOf(state: TrackingState) = DetectedMarker(
         index = 1,
@@ -237,6 +331,16 @@ class FilamentRendererTest {
         corners = listOf(Vec2(-1f, -1f), Vec2(1f, -1f), Vec2(1f, 1f), Vec2(-1f, 1f)),
         inlierCount = 120,
     )
+
+    /** Prepara a **casa de referência** do repositório (`3d_models/House.glb`) numa cópia temporária. */
+    private fun prepareHouseModel(): PreparedModel {
+        val source = File("3d_models", "House.glb")
+        assertTrue(source.isFile, "modelo de teste ausente: ${source.absolutePath}")
+
+        val copy = tempDir.resolve("House.glb").toFile()
+        source.copyTo(copy, overwrite = true)
+        return AssimpModelLoader.prepare(copy).getOrThrow()
+    }
 
     /** Prepara o logo do repositório (STL → GLB) numa cópia temporária. */
     private fun prepareLogoModel(): PreparedModel {
@@ -311,6 +415,39 @@ class FilamentRendererTest {
             }
         }
         return painted
+    }
+
+    /**
+     * Centro (coluna, linha) dos pixels **desenhados** que passam no [filter] — a média das
+     * posições no quadro.
+     *
+     * "Desenhado" é o mesmo critério de [countPaintedPixels] (longe do fundo); o [filter] escolhe
+     * *qual* parte do modelo interessa — a porta vermelha do `House.glb` (dominância de canal) ou o
+     * modelo inteiro (o filtro padrão, que aceita tudo). É esta a medida que diz **onde** o modelo
+     * (ou uma face dele) caiu no quadro, e não só que ele apareceu. Devolve `null` quando nada
+     * passou.
+     */
+    private fun centroidOf(
+        frame: SceneFrame,
+        background: BackgroundFrame,
+        filter: (Int, Int, Int) -> Boolean = { _, _, _ -> true },
+    ): Pair<Double, Double>? {
+        val reference = pixelAt(background, 0, 0)
+        var sumX = 0.0
+        var sumY = 0.0
+        var count = 0
+        for (y in 0 until frame.height) {
+            for (x in 0 until frame.width) {
+                val pixel = pixelAt(frame, x, y)
+                val distance = (0 until 3).maxOf { kotlin.math.abs(pixel[it] - reference[it]) }
+                if (distance <= PAINT_THRESHOLD) continue
+                if (!filter(pixel[0], pixel[1], pixel[2])) continue
+                sumX += x
+                sumY += y
+                count++
+            }
+        }
+        return if (count == 0) null else sumX / count to sumY / count
     }
 
     /** Maior valor de canal no quadro — serve para saber se há luz na cena. */

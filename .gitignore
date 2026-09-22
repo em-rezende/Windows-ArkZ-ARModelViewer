@@ -18,5 +18,9 @@ dist/
 *.exe
 *.hprof
 
+# …menos o wrapper do Gradle: sem ele um clone novo não consegue rodar o
+# `gradlew.bat` (e o projeto não se reconstrói a partir do repositório).
+!gradle/wrapper/gradle-wrapper.jar
+
 # Logs locais (o app também grava logs em %LOCALAPPDATA%)
 *.log

@@ -4,7 +4,7 @@ Port da versão Android (`https://github.com/em-rezende/Android-ArkZ-ARModelView
 para Windows 10/11, com **fidelidade comportamental**: o usuário deve reconhecer o
 mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
 
-> **Concluídas e validadas: etapas 0 a 6 e 9.** As etapas 0 a 4 entregaram o esqueleto, a
+> **Concluídas e validadas: etapas 0 a 9.** As etapas 0 a 4 entregaram o esqueleto, a
 > lógica portável + i18n, a câmera, a detecção de marcador, a ancoragem do modelo com a
 > projeção derivada das intrínsecas da detecção, a leitura/conversão dos seis formatos e o
 > **backend Filament desenhando a cena fora da tela**. A **etapa 5** trouxe a interface
@@ -15,11 +15,12 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
 > sobre o marcador reconhecido, **modelo 3D carregado pelo diálogo nativo aparecendo
 > ancorado**, zoom e arrasto respondendo, e as ações conferidas uma a uma. A **etapa 9**
 > fechou a documentação, o `CHANGELOG.md`, o `NOTICE` (licença e créditos na interface e no
-> pacote), o `.gitattributes` e a publicação deste repositório. **199 testes unitários
-> verdes**, dos quais **três desenham quadros de verdade na GPU**. Continuam **abertas as
-> etapas 7 (captura de tela sem interface, com as três qualidades) e 8 (instalador `.msi`)**:
-> nenhuma das duas bloqueia o uso — o pacote portátil é o que o teste em campo usou, e o
-> instalador só acrescenta o atalho do menu Iniciar.
+> pacote), o `.gitattributes` e a publicação deste repositório. **210 testes unitários
+> verdes**, dos quais **três desenham quadros de verdade na GPU**. As **etapas 7 (captura de tela
+> sem interface, com as três qualidades) e 8 (instalador `.msi`)** também estão fechadas: a captura
+> usa a mesma função de desenho num alvo maior, e o `.msi` (jpackage + WiX, que o Gradle baixa sozinho) traz atalho no menu
+> Iniciar, desinstalador e `upgradeUuid` fixo — o pacote portátil continua sendo o caminho para
+> levar o aplicativo a outro computador **sem instalar nada**.
 
 | Etapa | Entrega | Como é validada |
 |---|---|---|
@@ -29,9 +30,9 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
 | **3** ✅ | Detecção de marcador: ORB + `BFMatcher` (Hamming) + homografia RANSAC + `solvePnP` (IPPE), com a interface equivalente ao `AugmentedImage` (id, name, pose, extentX, extentZ, trackingState); caixa ciano sobre o marcador | 11 testes com quadro **sintetizado** (homografia conhecida): cantos, pose, distância real de uso (30–60 cm), sem falso positivo, `TRACKING → PAUSED → fora da cena` e falhas nativas tratadas — veja `docs/marker-detection.md` |
 | **4** ✅ | Renderização: Filament (filament-kmp) com `SceneRenderer` (interface) e backend alternativo LWJGL/OpenGL; importação por diálogo nativo com validação por extensão; Assimp converte `.obj/.stl/.ply/.3mf` para GLB. **Feito até aqui:** `render/ModelPlacement.kt` — a matriz que leva a geometria do arquivo ao referencial do mundo (pose do marcador ∘ [ancoragem · rotação · escala]), 7 testes; `render/AssimpModelLoader.kt` — leitura dos seis formatos, caixa envolvente em unidades do arquivo, conversão para GLB ao lado do original e mensagens de erro tratáveis, 8 testes com os modelos do repositório; `render/SceneRenderer.kt` — a descrição de cena (`RenderScene`: fundo, marcador, modelo, ajustes) e o contrato do renderizador, com desenho **fora da tela** + leitura de pixels, 8 testes; `render/FilamentSpikeTest` — **o motor gráfico do Filament inicializa e desenha um quadro offscreen de 256×256 nesta máquina** (a decisão 2 deixou de ser suposição). **Feito também:** `render/FilamentRenderer.kt` — o backend Filament completo (cena, câmera com a projeção das intrínsecas da detecção, duas luzes direcionais, plano de fundo com o vídeo da câmera e o modelo pelo `gltfio`), com 3 testes que **desenham na GPU** e conferem os pixels. **E a ligação com a janela:** `SceneComposer` (laço de desenho numa thread própria), `ArSceneSection` (tela, botão de carregar e painel de ajustes), `ModelPicker` (diálogo nativo) e `SceneImageCache` (conversões de imagem) — 8 testes. | Os seis formatos (`.glb`, `.gltf`, `.obj`, `.stl`, `.ply`, `.3mf`) ancorados no marcador, com a mesma ancoragem do Android. Já validado: a conta de ancoragem (base no plano, elevação na normal, rotação no referencial do marcador), a conversão de cada formato (cabeçalho GLB conferido byte a byte) e a inicialização do motor gráfico e a **compilação do material de fundo em tempo de execução** (`MaterialSpikeTest`); e **validado na janela, em hardware real**: vídeo da webcam como fundo, caixa ciano sobre o marcador reconhecido e **modelo 3D carregado pelo diálogo do Windows aparecendo ancorado** |
 | **5** 🟡 | Interface completa, **organizada em menus** (pedido do usuário, para separar assuntos): **Idioma** (a lista dos oito idiomas), **Modelo** (Carregar modelo · Ajustes do modelo · Escala automática · Redefinir configurações), **Câmera** (Reiniciar · Capturar tela), **Escolher marcador** (Gerenciar · Criar · Carregar marcador), **Ajuda** (Ajuda · Sobre · Qualidade da captura · Folha de impressão · Copiar diagnóstico) e **Sair**; mais o **rodapé de estado** com três linhas: programa/ambiente (versão, sistema, idioma, renderizador), modelo carregado (e a última mensagem) e marcador escolhido (com "●" quando a câmera está lendo a figura). **Feito:** `ui/ArMenuBar.kt` (os seis menus e os itens como dados), `ui/ArDialogs.kt` (ajuda, sobre, qualidade, **gerenciar marcador** e **criar marcador**), `ui/ArSceneSection.kt` (a tela, com o compositor como fonte única dos ajustes e o rodapé), `render/MarkerSelection.kt` (5 testes) e `render/AutoScale.kt` (4 testes). A tela de RA passou a ser a **tela principal** (a antiga tela de verificação das etapas 0–2 saiu, como o roadmap previa). **Conferido na janela:** Idioma, Reiniciar, Ajustes do modelo, Escala automática, Sair, o arrasto do modelo e o redimensionamento. **Falta:** conferir "Escolher marcador" (com duas figuras à mão), "Capturar tela" e o diálogo de ajustes; o zoom por `Ctrl`+roda **já foi confirmado na janela**. **Correções do teste em campo (decisões 21 e 22):** o painel de ajustes virou **diálogo** (aberto abaixo do vídeo, ele empurrava o modelo para fora da janela), a barra ficou na ordem **Modelo, Câmera, Escolher marcador, Idioma, Ajuda, Sair**, e entraram os botões **Ajustes do modelo**, **Escala automática** e **Capturar tela** ao lado de "Carregar modelo" | Reprodução de todos os fluxos do app Android |
-| **6** ✅ | Interações: pinça em tela sensível ao toque, pinça em touchpad de precisão, `Ctrl`+roda, `+`/`-`, arrastar com o mouse (modo livre). **Feito:** `render/InteractiveInput.kt` (a conversão de gesto em tamanho e deslocamento, 10 testes: zoom multiplicativo de 10% por passo com a faixa inteira em ~49 passos, o fator da pinça e os passos da roda dando o mesmo resultado, arrasto proporcional ao tamanho do modelo, sinal do eixo vertical e limite de 50 cm), o painel de `RenderScene`/`ModelPlacement` com o **deslocamento no plano** (o arrasto não mexe na normal nem tira a base do plano) e a montagem na área do vídeo: `Ctrl`+roda, `+`/`=`/`-`, pinça de toque e arrasto. **O ponto de plataforma:** no desktop a pinça de touchpad de precisão **chega como `Ctrl`+roda** — os dois gestos são o mesmo caminho de código. **Conferido na janela:** `Ctrl`+roda (o zoom funciona) e o arrasto com o mouse — com **uma correção**: o sentido vertical estava invertido ("para a frente" levava o modelo "para trás") e foi corrigido pelo teste em campo, com o teste do sentido atualizado (decisão 21); **falta** reconferir o arrasto depois da correção. A pinça de touchpad **não é verificável nesta máquina** (sem touchpad e sem tela de toque) — e a **pinça de dois dedos na tela sensível ao toque não funciona**, nem tem como funcionar nesta plataforma: a entrada do Compose Desktop no Windows não recebe toque múltiplo (decisão 31, com a medição que comprova). Em lugar dela, o zoom por toque ganhou os botões `−`/`+` na fileira de comandos, além do cursor de tamanho nos ajustes e da escala automática. | Zoom entre 0,02 m e 2,0 m nos dois tipos de entrada |
-| **7** | Captura de tela em `Pictures/ArkZ ARModelViewer/` **sem a interface** (render offscreen), com as três qualidades (1280, 1920, máxima) e som de disparo | PNG sem interface, com câmera + modelo |
-| **8** | Instalador `.msi` (jpackage + WiX), ícone, atalho e menu Iniciar | Instalação em pasta limpa e execução pelo menu Iniciar |
+| **6** ✅ | Interações: pinça em tela sensível ao toque, pinça em touchpad de precisão, `Ctrl`+roda, `+`/`-`, arrastar com o mouse (modo livre). **Feito:** `render/InteractiveInput.kt` (a conversão de gesto em tamanho e deslocamento, 11 testes: zoom multiplicativo de 10% por passo com a faixa inteira em ~49 passos, o fator da pinça e os passos da roda dando o mesmo resultado, arrasto proporcional ao tamanho do modelo, sinal do eixo vertical e limite de 50 cm), o painel de `RenderScene`/`ModelPlacement` com o **deslocamento do arrasto** — a largura da figura e o frente–trás (decisão 36) — e a montagem na área do vídeo: `Ctrl`+roda, `+`/`=`/`-`, pinça de toque e arrasto. **O ponto de plataforma:** no desktop a pinça de touchpad de precisão **chega como `Ctrl`+roda** — os dois gestos são o mesmo caminho de código. **Conferido na janela:** `Ctrl`+roda (o zoom funciona) e o arrasto com o mouse — com **uma correção**: o sentido vertical estava invertido ("para a frente" levava o modelo "para trás") e foi corrigido pelo teste em campo, com o teste do sentido atualizado (decisão 21); o arrasto foi reconferido em campo outras duas vezes, e nesta última o **eixo** do movimento vertical foi corrigido (1.0.6, decisão 36). A pinça de touchpad **não é verificável nesta máquina** (sem touchpad e sem tela de toque) — e a **pinça de dois dedos na tela sensível ao toque não funciona**, nem tem como funcionar nesta plataforma: a entrada do Compose Desktop no Windows não recebe toque múltiplo (decisão 31, com a medição que comprova). Em lugar dela, o zoom por toque ganhou os botões `−`/`+` na fileira de comandos, além do cursor de tamanho nos ajustes e da escala automática. | Zoom entre 0,02 m e 2,0 m nos dois tipos de entrada |
+| **7** ✅ | Captura de tela em `Pictures/ArkZ ARModelViewer/` **sem a interface** (render offscreen), com as três qualidades (1280, 1920, máxima) e som de disparo | PNG sem interface, com câmera + modelo — gravado nas máquinas de teste |
+| **8** ✅ | Instalador `.msi` (jpackage + WiX, que o Gradle baixa sozinho), ícone, atalho e menu Iniciar, com `upgradeUuid` fixo | `gradlew.bat packageMsi` gera o `.msi` em `build/compose/binaries/main/msi/`; a instalação em pasta limpa e a execução pelo menu Iniciar são conferidas na máquina de destino. **Pendência registrada:** o `.msi` não leva as DLLs do Visual C++ que o portátil leva ao lado do `.exe` (medido: 227 arquivos contra 230) — o conserto é `appResourcesRootDir` mais `AddDllDirectory` na abertura do app |
 | **9** ✅ | Documentação (README, `docs/`), scripts de apoio em `tools/`, notas de release (`CHANGELOG.md`), `NOTICE` com a licença e os créditos, `.gitattributes` e a publicação no GitHub | Revisão final e teste com webcam |
 
 ## Decisões já tomadas (e o porquê)
@@ -162,7 +163,11 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     da figura e pô-lo ao lado, sobre a mesa. O deslocamento por pixel acompanha o tamanho do
     modelo (arrastar "uma tela" move a mesma proporção da tela, com 5 cm ou com 2 m), é
     limitado a 50 cm (o modelo não se perde de vista), não mexe na normal e não tira a base do
-    plano — três propriedades com teste. Observação de fidelidade: o clone de referência do
+    plano — três propriedades com teste. **Revisto pela decisão 36 (1.0.6):** a pedido do teste
+    em campo, o arrasto vertical passou a andar **na normal** — o frente–trás —, e o Z (a altura
+    NA imagem) saiu do arrasto: era ele que, com a figura de frente para o usuário, fazia o
+    modelo subir e descer. O arrasto continua limitado a 50 cm e continua sem girar com os
+    cursores de rotação (agora com teste próprio). Observação de fidelidade: o clone de referência do
     projeto Android foi removido pelo Windows durante o desenvolvimento, então esta
     interpretação do "modo livre" está documentada como interpretação, e não como cópia
     verificada do comportamento original.
@@ -470,6 +475,12 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     **O que fica como característica, e não como defeito:** o modelo carrega na orientação do
     arquivo, então um arquivo com outro eixo para cima pede o cursor **Rotação X** em 90° —
     exatamente como no Android, e é o mesmo número nos dois aplicativos.
+    **Revisto pela decisão 38 (não publicado):** "a orientação do arquivo" deixou de ser uma suposição
+    e passou a ser uma **correspondência de eixos escrita** no código (`ModelPlacement.MODEL_ORIENTATION`):
+    o plano XY do arquivo é o plano da figura e o +Z do arquivo é a normal, o que põe o modelo de pé
+    **com a folha de frente para a webcam** — a situação do desktop, e a que faltava. A ancoragem do
+    `ModelMetrics` continua a mesma (base apoiada no plano, centrada na largura e na altura da imagem);
+    o que mudou é que ela recebe a caixa **já orientada**.
 35. **A rotação inicial do modelo é 90° em X — e agora está no código, não no usuário.** Os
     arquivos desta família (CAD/SketchUp, e tudo o que o Assimp converte de
     `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para cima**: com a rotação inicial em zero o modelo
@@ -478,7 +489,215 @@ mesmo aplicativo — as mesmas ações, os mesmos textos, os mesmos números.
     desta versão — era um **padrão que faltava**. `RenderScene.DEFAULT_ROTATION_DEGREES` passa a
     ser esse valor: o cursor de Rotação X abre em **90°** e o "Redefinir" volta para lá, e o
     usuário continua livre para ajustar X, Y e Z a partir dele. Um teste cobra o valor inicial.
-    **Segunda etapa, ainda aberta (a pedido do usuário, para conferir uma de cada vez):** o
-    **arrasto vertical** — hoje o movimento do mouse no eixo Y mexe a **normal** do marcador
-    (o modelo sobe e desce, saindo do papel); o pedido é que ele ande no plano da figura, como
-    já acontece com o eixo X.
+    **Segunda etapa, fechada na 1.0.6 (decisão 36):** o **arrasto vertical**. A hipótese
+    registrada nesta linha — "hoje o movimento do mouse no eixo Y mexe a normal do marcador" —
+    foi **medida e é falsa**: o arrasto escrevia o **Z**, e passou a escrever o **Y** (veja a
+    decisão 36).
+
+    **Corrigida na 1.0.7 (decisão 37):** a premissa do **Z para cima** **não se confirmou** nos
+    arquivos do repositório (medidos: o para cima deles é o **+Y**), e, com o modelo já **de pé**
+    no zero dos cursores, os 90° em X **deitavam** o modelo no plano da folha — o giro da folha
+    passava a **rolá-lo** ali dentro. A rotação inicial voltou a **zero**.
+36. **O arrasto vertical anda no frente–trás (a normal), e não na altura da imagem.** O relato do
+    usuário, no notebook e com o "Marcador A" impresso e **virado para ele**, foi: o arrasto
+    vertical do mouse **sobe e desce o modelo** em vez de movê-lo frente–trás sobre a figura; o
+    horizontal estava certo. A hipótese registrada na 1.0.5 era que o arrasto estivesse escrevendo
+    a **normal** do marcador; o pedido foi *medir* antes de mexer. A medição mostrou outra coisa —
+    e é este o valor desta decisão:
+    (a) **o código andava no plano**, sim: escrevia **X** (a largura) e **Z** (a "altura NA
+    imagem") e forçava Y = 0, então o modelo não saía do papel por construção. A hipótese da
+    "incoerência" no mapeamento estava errada;
+    (b) o que decide o resultado não é a intenção do código, e sim **o que a pose entrega**. Num
+    quadro sintetizado com a figura real de 0,15 m **de frente** para a câmera, a 21 cm, as
+    colunas da rotação do `solvePnP` — no referencial do mundo (X para a direita, Y para cima,
+    câmera olhando para −Z) — são: **X do marcador = (0,99, −0,05, 0,12)** (a largura, para a
+    direita), **Y = (−0,13, −0,38, 0,92)** (a **normal**, apontando para a câmera) e
+    **Z = (0,00, −0,92, −0,38)** (a altura NA imagem — e, nesta pose, o **chão do mundo**). O
+    teste `de frente para a camera a pose entrega a normal no Y e a altura na imagem no Z`
+    (`MarkerDetectorTest`) refaz essa medição a cada execução da suíte: se a detecção mudar de
+    referencial, é ali que o teste quebra primeiro;
+    (c) a conta do arrasto, medida em `InteractiveInputTest` com essa pose e um modelo de 50 cm
+    (100 px = 0,1 m): escrito no **Z** o modelo andava **92 mm na vertical do mundo** e só 38 mm
+    em profundidade — era este o "sobe e desce" —, e escrito no **Y** ele anda **92 mm
+    frente–trás** (se aproximando da câmera) e 38 mm na vertical.
+    **A correção é uma troca de eixo, e nada mais:** o arrasto vertical passou a escrever o **Y**
+    (a normal — o mesmo eixo do cursor de **Elevação**, com o mesmo sentido: arrastar para baixo
+    traz o modelo para a frente) e o **Z ficou em zero** (`InteractiveInput.panOffset` e
+    `SceneComposer.setOffsetMeters`). O horizontal não mudou: continua a largura (X). A rotação
+    inicial, a ancoragem e o referencial do marcador **não** foram tocados — o que estava aprovado
+    em campo continua igual (`ModelPlacement` segue com `local = T · R · S`, sem apoio embutido — hoje
+    `local = T · ORIENTAÇÃO · R · S`, com a correspondência de eixos da decisão 38).
+    **O que se abre mão, e por quê:** com o arrasto na largura e no frente–trás, o modelo deixa de
+    ser movido **na altura da figura** por gesto — que é exatamente o movimento que o usuário
+    recusou. Para uma figura deitada **na mesa**, o frente–trás passa a ser a normal da mesa (o
+    modelo levanta e baixa do papel): é o mesmo eixo, com outro significado conforme a figura
+    esteja em pé ou deitada. Se o campo pedir o contrário nesse caso, a troca é de uma linha, e o
+    teste do eixo (`o arrasto vertical anda no frente-tras, e nao na altura da imagem`) é quem
+    guarda a decisão.
+    **A lição, para o próximo relato de arrasto:** "anda no plano" não descreve o que o usuário
+    vê. Quem decide o sentido de um gesto é a **pose medida** — e medi-la é barato (um quadro
+    sintetizado, como o `MarkerDetectorTest` já fazia desde a etapa 3). A hipótese registrada na
+    1.0.5 apontava o **eixo errado**, e a diferença entre o eixo suposto e o eixo real é
+    exatamente a que se mediu: 92 mm de vertical contra 38 mm de profundidade.
+
+37. **A rotação inicial voltou a ser zero: o modelo carrega de pé e o giro da folha gira o modelo em
+    torno da vertical.** O relato do usuário, com as capturas do painel e da folha na mesa, foi:
+    *o giro do marcador não gira o modelo, e nenhuma das combinações de ajuste resolveu* — e ele
+    apontou o lugar certo: *não sei por que o cursor **Rotação X** está em 90°; acho que ele deveria
+    zerar*. Duas coisas se somaram:
+    (a) **os dois ajustes de teste da 1.0.6 não existiam no código.** `DEFAULT_SEGUIR_A_FOLHA` e
+    `DEFAULT_EM_PE_NA_VERTICAL` eram **parâmetros de `worldMatrix` sem nenhuma implementação**:
+    qualquer que fosse o valor, a matriz saía igual. Era por isso que **nenhuma** das combinações
+    conferidas em campo mudava o que o usuário via — e era por isso que **dois testes falhavam**
+    desde então (eles cobravam o comportamento que não estava lá). Os dois foram **removidos**: com o
+    modelo de pé, o giro da folha já é o prato giratório que o campo pediu. Um modo "vertical do
+    mundo" só faria falta para uma folha **inclinada de propósito** (apoiada num livro, por exemplo),
+    em que o modelo teria de ficar em pé na vertical do mundo em vez de seguir a normal da folha —
+    fica como **possibilidade registrada**, não como pendência: hoje o modelo se comporta como um
+    objeto **colado na folha**, que é o que o app Android faz e o que a decisão 34 fixou.
+    (b) **a premissa dos 90° em X era falsa, e a medição a desfez.** A decisão 35 supôs que estes
+    arquivos têm o **Z para cima**. Medidos os modelos do repositório, o "para cima" deles é o **+Y**:
+    o **`ArkZ_logo.obj`** (a fonte do logotipo) mede **419,0 no X**, **140,9 no Y** e **10,0 no Z** —
+    a altura está no Y —, o `ArkZ_logo.glb` que o Assimp gera dele tem exatamente as mesmas medidas, o
+    `House.glb` (Blender) mede 5,0 × 4,5 × 5,0 com a **porta vermelha na face +Z** e o telhado no topo
+    do Y — é a casa de referência dos testes de GPU desde a decisão 38. Como o `ModelPlacement`
+    ancora na orientação do arquivo, **sem apoio embutido** (decisão 34), o zero dos cursores é o
+    estado **de pé** — e os 90° em X o **deitavam**.
+    **A medição, feita na GPU** (motor do Filament, a folha deitada na mesa a 0,6 m de uma câmera 25°
+    abaixo da horizontal, o `House.glb` em 0,13 m, a folha girada de 90° em 90°), com o topo do modelo
+    — o ponto mais alto do arquivo — projetado no quadro de 640 × 360 px:
+    | Rotação inicial | Altura do topo **pela normal da folha** | Altura do topo no mundo | O que o giro da folha faz |
+    |---|---|---|---|
+    | 90° em X (1.0.5–1.0.6) | **0,000 m** — dentro do plano | −0,0549 m a 90° contra +0,0541 m a 0° | **rola**: o topo anda 115 px de lado (320 → 428) |
+    | **zero** (agora) | **0,117 m** — a altura do modelo | **igual nos quatro giros** | **gira**: o topo cai no mesmo pixel (320, 73) nos quatro giros |
+    O teste que guarda isso é `com a folha deitada na mesa, girar a folha gira o modelo em torno da
+    vertical` (`ModelPlacementTest`), que mede as duas colunas do meio da tabela e que **falha** com os
+    90° em X de volta: *com a folha a 0,0° o modelo tem de continuar DE PÉ (subiu 3,7e-9 m pela
+    normal, e não 0,13 m)*.
+    **A correção é de uma linha** — `RenderScene.DEFAULT_ROTATION_DEGREES = Vec3.ZERO` — e nada mais
+    foi tocado: a ancoragem (`ModelMetrics.anchorPosition`), o referencial do marcador, o arrasto
+    (decisão 36) e os cursores seguem iguais. Um arquivo com outro eixo para cima continua pedindo o
+    cursor **Rotação X** em 90°, como no app Android.
+    **A lição:** a premissa "estes arquivos têm o Z para cima" atravessou três versões (1.0.3, 1.0.5 e
+    o texto da decisão 35) **sem uma única medição** — e era ela que explicava o defeito que a 1.0.5
+    dizia corrigir. Medir os arquivos do próprio repositório (o `.obj`, o `.glb` do Blender e o do
+    SimLab) custou um comando, e teria evitado a volta inteira.
+    **Revisto pela decisão 38 (não publicado):** a decisão 37 corrigiu o valor **inicial** dos cursores
+    (de 90° em X para zero), mas a correspondência de eixos continuou a de **identidade** — o que só dá
+    "de pé" com a folha **deitada na mesa**, que era a situação das capturas. Com a folha **de frente
+    para a webcam** (a situação do relato seguinte) o modelo carregava deitado de costas e girava no eixo
+    errado; é a decisão 38 que fixa a correspondência (o plano XY do arquivo é o plano da figura e o +Z
+    do arquivo é a normal). O zero dos cursores continua valendo — agora como "em pé, de frente".
+
+38. **O modelo carrega DE PÉ com a face virada para quem olha: o plano XY do ARQUIVO é o plano da figura, e
+    o +Z do arquivo é a normal do marcador.** O relato, com o "Marcador A" impresso e **virado para o
+    usuário** (a situação do desktop: a webcam fica no monitor e a folha é erguida à frente dela): *"giro o
+    marcador em torno da sua normal e o modelo gira no eixo Y em vez do Z"* e, no mesmo quadro, *"os modelos
+    estão sendo carregados deitados"*. Os dois sintomas têm uma causa só — e ela não está em nenhum dos dois
+    lugares onde a busca começou (a rotação inicial do painel e o arquivo do modelo):
+    (a) **a causa.** O `ModelPlacement` ancorava o modelo com a correspondência de **identidade** (como o
+    app Android, que herda o referencial do ARCore): o **+Y** do arquivo (a altura, no glTF) ia para o
+    **+Y do marcador**, que é a **NORMAL**. Isso só dá "de pé" quando a normal é a vertical do mundo — isto
+    é, com a folha **apoiada na mesa**, o caso que a decisão 37 mediu na GPU. Com a folha de frente para a
+    câmera a normal é **horizontal**: o modelo carrega **deitado de costas** (o telhado apontando para quem
+    olha) e o giro da folha em torno da normal — que é o giro em torno do **Y do marcador** — roda o modelo
+    em torno do **próprio Y**, e não do eixo correspondente;
+    (b) **a correção.** Uma **correspondência de eixos fixa** entre o arquivo e o marcador
+    (`ModelPlacement.MODEL_ORIENTATION`, uma rotação de −90° em X), que é exatamente o referencial que o
+    relato descreve: **X do arquivo → X do marcador** (a largura), **Y do arquivo → −Z do marcador** (a
+    altura NA imagem, para cima) e **Z do arquivo → Y do marcador** (a normal). Com ela o plano **XY** do
+    arquivo (a face do modelo) é o plano da figura, o **+Z** do arquivo (a face que "olha") cai na normal,
+    e girar a folha pela normal gira o **+Z do arquivo** — eixo por eixo, como pedido;
+    (c) **a ancoragem entrou junto, e não é detalhe.** O `ModelMetrics.anchorPosition` apoia no plano a face
+    de **trás** do modelo e o centra na largura e na altura da imagem — mas ele trabalha no referencial do
+    **marcador** e recebia a caixa do **arquivo**. Com a orientação, o "Y" da caixa passa a ser a
+    **espessura** do modelo e o "Z" a **altura** dele: sem `ModelPlacement.orientedBounds` a ancoragem
+    apoiaria a face errada (o modelo ficaria metade à frente e metade atrás da figura). O deslocamento do
+    arrasto, a elevação e o referencial do marcador **não** mudaram;
+    (d) **os cursores giram nos eixos do arquivo** (X = largura, Y = "para cima", Z = o "frente"), na ordem
+    `T · ORIENTAÇÃO · R · S`: é o que dá sentido ao painel — "Rotação Z" gira em torno do eixo que sai da
+    folha (a normal), que é o que se vê — e é o que mantém o **zero** como "em pé, de frente" (a decisão 37
+    continua valendo: o painel abre em zero);
+    (e) **a medição, feita na GPU** (o motor do Filament, a folha de frente para a câmera a 0,5 m, num
+    quadro de 96 × 96, com os modelos do próprio repositório):
+
+    | Modelo (sem giro nenhum) | Pixels desenhados | O que se vê |
+    |---|---|---|
+    | `House.glb` — a referência: 5,0 × 4,5 × 5,0, telhado no topo do **Y** e a **porta vermelha na face +Z** | **1915**, iluminado | a casa **de pé**, com a porta virada para a câmera |
+    | `ArkZ_logo.stl` — a chapa do logo: a altura no **Z** e a espessura no **Y** (a convenção do **STL**, que não tem metadado de eixo) | **0** | a chapa fica **de perfil**; com **90° no cursor X** ela mostra a face (**146** pixels) |
+
+    Os testes que guardam isso: `de frente para a camera o modelo aparece de pe com a frente virada para quem
+    olha` e `girar o marcador pela normal gira o modelo no proprio eixo Z, sem deita-lo` (em
+    `ModelPlacementTest`, com as medidas do `House.glb` de referência) e o teste de GPU
+    `o modelo aparece ancorado no marcador e some sem rastreio` (`FilamentRendererTest`, que agora usa a casa
+    de referência e o logo do repositório, e cobra que a **porta vermelha** apareça no quadro).
+    **Conferido por mutação:** com a correspondência de identidade de volta (`MODEL_ORIENTATION` sem o
+    −90° em X), **9 testes falham** — entre eles o da GPU, com *"a porta vermelha da casa tem de aparecer
+    virada para a câmera"* (a casa até aparece, mas vista de cima, com o telhado verde para a câmera);
+    (f) **o que se abre mão, e por quê.** O modelo é **colado à figura**, e não orientado pela vertical do
+    mundo: com a folha apoiada na mesa ele aparece **deitado com a face para cima** (o teste
+    `com a folha apoiada na mesa o modelo fica deitado com a face para cima` mede isso). É o preço de a
+    correspondência ser **fixa** — e ela precisa ser fixa para o giro da folha chegar ao eixo
+    correspondente, que é o pedido do relato. Um arquivo com outro eixo para cima continua pedindo o cursor
+    correspondente: com esta correspondência, um arquivo **Z-para-cima** fica de pé com **−90°** no cursor X
+    (o teste `um arquivo exportado com o Z para cima fica de pe com menos 90 graus no cursor X`).
+    **A lição:** o par "modelo deitado / giro no eixo errado" já tinha aparecido na decisão 34 e voltou na 37
+    porque a **situação de campo** mudou (a folha na mesa × a folha na mão, de frente para a webcam) sem que
+    a correspondência de eixos estivesse escrita em lugar nenhum. Agora ela está: uma constante
+    (`MODEL_ORIENTATION`), um KDoc e quatro testes.
+
+39. **O modelo aparecia de cabeça para baixo em relação ao vídeo: a leitura do quadro era invertida e a
+    textura do fundo compensava.** O relato seguinte ao da decisão 38, com o "Marcador A" virado para a
+    webcam: *"a casa apareceu de cabeça para baixo, com o telhado apoiado na folha e o piso para cima;
+    girando o marcador 180° ela fica em pé"* e *"o arrasto frente–fundo está invertido"*. O **modelo** e o
+    **vídeo** discordavam entre si — e a causa era **antiga**, invisível até a decisão 38:
+    (a) **a causa: duas inversões verticais que se cancelavam só para o vídeo.** A leitura do quadro
+    aplicava `flippedVertically()` e as coordenadas de textura do plano de fundo (`QUAD_VERTICES`) punham a
+    linha de cima da imagem no topo do mundo com `v = 1`. O par fazia o **vídeo** aparecer certo no quadro
+    (é o que o teste de orientação do fundo sempre cobrou ✓) enquanto tudo o que é ancorado no **mundo** —
+    o **modelo** — aparecia **espelhado na vertical**. Enquanto o modelo carregava "deitado" (o plano XY
+    dele no plano da folha, até a 1.0.7) o espelho caía no plano horizontal e não aparecia; com o modelo
+    **de pé** (decisão 38) ele ficou óbvio — e o sintoma descrito ("de cabeça para baixo, e 180° de giro
+    consertam") é exatamente um espelho vertical;
+    (b) **a correção, um par de duas linhas:** a leitura passa a entregar o quadro **como o motor devolve**
+    (sem inverter — neste backend, **Vulkan**, medido, ele já vem de cima para baixo) e o plano de fundo
+    passa a levar `v = 0` embaixo e `v = 1` em cima. Juntas: o vídeo **continua** de pé no quadro e o
+    modelo passa a cair **do mesmo lado** que ele;
+    (c) **a medição** (GPU, o `House.glb` a 0,5 m, quadro de 96×96, com deslocamentos conhecidos nos eixos
+    do marcador — o offset entra na ancoragem, que é soma pura e não passa por rotação):
+
+    | Deslocamento no marcador | Antes (1.0.7 + decisão 38) | Agora |
+    |---|---|---|
+    | **Z** +0,1 m (a "altura NA imagem", para baixo) | o modelo ia para **CIMA** (linha 59,7 → 27,2) | vai para **BAIXO** (67,3 → 99,8) |
+    | **X** +0,1 m (a largura, para a direita) | à direita (coluna 63,2 → 98,0) | à direita (coluna 63,2 → 98,0) |
+    | **Y** +0,1 m (a normal, para a frente) | aproxima (n.º de pixels desenhados: 3 429 → 7 712) | aproxima (igual) |
+    | **porta vermelha** do `House.glb` (a parte de baixo da casa, na exportação de então) | desenhada **acima** do centro do modelo (linha 33,9, contra 44,6 do modelo) | **abaixo** (é o que o teste cobrava; hoje quem mede a vertical é o **cubo do telhado**, porque a porta do `House.glb` re-exportado ficou na face do X, fora do campo da câmera de frente) |
+
+    > **Nota (22/09/2026):** o `House.glb` do repositório foi **re-exportado do Blender em +Y para cima**
+    > depois desta medição. A casa passou a **5,0 × 5,0 × 4,5 centrada na origem** (o chão em y = −2,5, e
+    > não mais em y = 0) e a porta foi para a face do **X**. O que estas decisões fixaram continua valendo
+    > e continua coberto — o **+Y do arquivo é a altura**, o plano XY do arquivo é o plano da figura e o
+    > quadro não é espelhado —, mas a medida da vertical no teste de GPU passou a ser o **cubo
+    > verde-amarelo do telhado** (medido: cubo na linha 37,0 contra 47,5 do modelo, num quadro de 96 × 96),
+    > e o `AssimpModelLoaderTest` guarda as medidas novas da casa (`o House glb de referencia tem a altura
+    > no Y e o teto no topo`).
+
+    **Conferido por mutação:** restaurando o par antigo (a leitura invertida + as texturas como estavam),
+    os **dois** testes do modelo falham — *"o cubo do telhado tem de ficar ACIMA do centro do modelo (cubo
+    em 58,0, modelo em 47,5 linhas)"* (**37,0** no estado correto) e *"o Z do marcador tem de levar o modelo
+    para BAIXO: (47,5, 47,5) → (47,5, 24,0)"* — e o **teste do vídeo continua passando**, que é a
+    assinatura do defeito: o vídeo certo, o modelo de cabeça para baixo. (Reconferido em 22/09, com o
+    `House.glb` re-exportado: na medição original, a **porta vermelha** fazia a primeira medida — *"porta em
+    33,9, modelo em 44,6 linhas"*.)
+    (d) **o arrasto:** a inversão do frente–trás relatada **não** se confirmou como defeito do arrasto — o
+    eixo (a normal) e o sentido ("arrastar para baixo **traz** o modelo para a frente", decisão 36) não
+    mudaram, e o que o espelho fazia era inverter o **quadro**, e com ele a leitura que o usuário faz do
+    movimento. Com o quadro no sentido certo, a percepção passa a bater com a decisão 36; se o campo ainda
+    pedir o contrário, é o sinal de **uma linha** em `InteractiveInput.panOffset` (e o teste do sentido é
+    quem guarda a decisão — nada foi mudado por conta própria);
+    (e) **a lição:** o par "vídeo certo + modelo errado" atravessou **três** decisões (34, 37 e 38) porque o
+    defeito ficava escondido no plano horizontal. O teste que o pegaria **não** é o da orientação do vídeo, e
+    sim um que meça **onde** o modelo cai *em relação ao vídeo* — com deslocamentos conhecidos nos eixos do
+    marcador. É o que `FilamentRendererTest` passou a fazer (`os eixos do marcador caem no quadro do mesmo
+    lado que o video mostra`), junto do que mede o **cubo do telhado** acima do centro do modelo (a
+    **porta vermelha** fazia essa medida até a re-exportação do `House.glb` — veja a nota acima).

@@ -13,6 +13,7 @@ package com.arkz.armodelviewer.render
 import com.arkz.armodelviewer.ar.Pose
 import com.arkz.armodelviewer.model.ModelMetrics
 import com.arkz.armodelviewer.model.Vec3
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -23,16 +24,20 @@ import kotlin.math.sin
  * ## A conta, e por que ela é assim
  *
  * ```
- * mundo = pose do marcador  ∘  [ translação de ancoragem · rotação · escala ]
+ * mundo = pose do marcador  ∘  [ translação de ancoragem · ORIENTAÇÃO DO ARQUIVO · rotação do usuário · escala ]
  * ```
  *
  * * a **pose do marcador** (`DetectedMarker.centerPose`) leva um ponto do referencial do
  *   marcador para o mundo — é a metade que vem da detecção;
- * * o colchete é o que o app Android deixava a cargo do nó do modelo: a **escala**
- *   normalizada (maior dimensão = tamanho escolhido), a **rotação dos sliders** (em
- *   graus, no referencial do marcador) e a **translação de ancoragem** do
- *   `ModelMetrics.anchorPosition` — que centraliza o modelo no marcador e apoia a base
- *   dele sobre o plano da imagem.
+ * * a **orientação do arquivo** ([MODEL_ORIENTATION]) é a correspondência de eixos fixa entre o
+ *   referencial do arquivo (glTF: **+Y** para cima, **+Z** para a frente) e o do marcador (o do
+ *   ARCore: X = largura, **Y = a normal**, Z = altura NA imagem). É ela que põe o modelo **de pé**
+ *   com a face olhando para quem vê — a correção da **decisão 38**;
+ * * o resto é o que o app Android deixava a cargo do nó do modelo: a **escala** normalizada
+ *   (maior dimensão = tamanho escolhido), a **rotação dos sliders** (em graus, nos eixos do
+ *   **arquivo** — os mesmos que o marcador adota depois da orientação) e a **translação de
+ *   ancoragem** do `ModelMetrics.anchorPosition` — calculada sobre a caixa **já orientada**, e
+ *   que centraliza o modelo na figura e apoia a face de trás dele sobre o plano.
  *
  * A ordem importa e é a mesma do app Android: escala e rotação acontecem em torno da
  * **origem do modelo**, e só depois ele é deslocado para o marcador. Fazer a conta "aqui
@@ -59,15 +64,100 @@ object ModelPlacement {
         metrics.normalization * sizeMeters
 
     /**
+     * Orientação com que a geometria do **arquivo** entra no referencial do **marcador** — a
+     * correspondência de eixos fixa do aplicativo (a decisão 38 do roadmap).
+     *
+     * ## Os dois referenciais
+     *
+     *  * **arquivo** — o do glTF, que é o que o Blender, o SketchUp, o SimLab e a conversão do
+     *    Assimp produzem: **+X** para a direita, **+Y** para cima e **+Z** para a frente (o eixo
+     *    em que o modelo "olha" — no `House.glb` do repositório, a **face da porta vermelha**);
+     *  * **marcador** — o do ARCore para imagens, e o que o `solvePnP` produz: **X** = largura
+     *    (para a direita), **Y** = a **NORMAL** (sai do plano da figura, na direção de quem olha)
+     *    e **Z** = a altura NA imagem (para baixo). O **plano** da figura é o **XZ** — é por isso
+     *    que o eixo do "para dentro/para fora" do plano é o **Y** (veja `ModelMetrics`).
+     *
+     * ## A correspondência (uma rotação de −90° em X)
+     *
+     * ```
+     * X do arquivo →  X do marcador   (a largura da figura)
+     * Y do arquivo → −Z do marcador   (a altura NA imagem: o "para cima" do arquivo é a imagem para cima)
+     * Z do arquivo →  Y do marcador   (a NORMAL: o "frente" do arquivo olha para quem está vendo)
+     * ```
+     *
+     * Com ela o **plano XY do arquivo** (a face do modelo) fica **paralelo ao plano da figura**, e
+     * o +Z do arquivo (o nariz, a porta) cai na **normal**: o modelo é colado na figura como um
+     * **relevo**, de pé e olhando para quem vê. E, como o giro da folha impressa em torno da
+     * própria normal é um giro em torno do **+Y do marcador** — que é o **+Z do arquivo** —, o
+     * modelo acompanha o giro **no seu eixo correspondente**, que é o pedido de campo.
+     *
+     * ## Por que ela existe (o defeito que ela corrige)
+     *
+     * Sem ela a correspondência era a **identidade**, e o "para cima" do arquivo (+Y) caía na
+     * **normal** do marcador. Numa folha **de frente para a webcam** — a situação do aplicativo
+     * de desktop, com o marcador na mão ou apoiado à frente do monitor — a normal é **horizontal**:
+     * o modelo carregava **deitado de costas** (a face para o teto) e o giro da folha o rodava em
+     * torno do próprio **Y**, em vez do eixo correspondente. Foi exatamente este o relato:
+     * *"o modelo gira no Y quando giro o marcador pela normal; ele deveria girar no Z"*.
+     *
+     * A folha **apoiada na mesa** (normal vertical) era o único caso em que a identidade dava
+     * "em pé" — e é o inverso do caso de campo. Como a correspondência tem de ser **fixa** (o
+     * modelo é colado à figura, e não orientado pela vertical do mundo), ela vale para os dois
+     * casos: com a folha na mesa, o modelo aparece deitado com a face para cima, girando no plano
+     * dela. Um modo "vertical do mundo" — que manteria o modelo de pé com a folha em qualquer
+     * inclinação — fica registrado como **possibilidade** na decisão 38 (como já estava na 37), e
+     * não como pendência: hoje o modelo se comporta como um objeto **colado na folha**.
+     *
+     * > **Por que não trocar o referencial do marcador?** Porque ele é o do ARCore, é **medido** e
+     * > está guardado por teste (`MarkerDetectorTest`), além de ser o mesmo do app Android: mexer
+     * > nele mudaria a pose que a detecção entrega. A troca aqui é de **orientação do arquivo**,
+     * > num lugar só.
+     */
+    val MODEL_ORIENTATION: FloatArray = eulerRotation(Vec3(-90f, 0f, 0f))
+
+    /**
+     * A caixa envolvente do arquivo **depois** de orientada por [orientation] — a caixa que a
+     * ancoragem precisa ver.
+     *
+     * O **centro** é um ponto e gira com a orientação; a **meia-extensão** vira a soma dos módulos
+     * das colunas, o que é **exato** para uma rotação de 90° (cada eixo do arquivo cai inteiro
+     * sobre um eixo do marcador). A conta é escrita na forma geral — e não como uma troca de
+     * eixos — para que ela continue valendo se a orientação mudar (um arquivo com outro eixo para
+     * cima, por exemplo).
+     *
+     * Sem esta passagem, `anchorPosition` apoiaria a face errada no plano: ele trabalha no
+     * referencial do **marcador** e receberia as medidas do **arquivo** (o Y dele é a altura do
+     * modelo, e não a normal).
+     */
+    fun orientedBounds(metrics: ModelMetrics, orientation: FloatArray): ModelMetrics {
+        val half = metrics.halfExtent
+
+        /** Extensão da caixa num eixo do marcador: os módulos da coluna do arquivo. */
+        fun span(row: Int): Float =
+            abs(orientation[row]) * half.x +
+                abs(orientation[4 + row]) * half.y +
+                abs(orientation[8 + row]) * half.z
+
+        return ModelMetrics(
+            center = apply(orientation, metrics.center),
+            halfExtent = Vec3(x = span(0), y = span(1), z = span(2)),
+        )
+    }
+
+    /**
      * Matriz do modelo no referencial do mundo.
      *
      * @param markerPose pose do marcador reconhecido.
      * @param metrics bounding box do modelo, em unidades do arquivo.
      * @param sizeMeters tamanho escolhido para a maior dimensão (0,02 a 2 m).
-     * @param rotationDegrees rotação do painel de ajustes, em graus, nos eixos do
-     *   referencial do marcador.
+     * @param rotationDegrees rotação do painel de ajustes, em graus, nos eixos do **arquivo**
+     *   (X = largura, Y = "para cima", Z = o "frente") — os mesmos que [MODEL_ORIENTATION] leva
+     *   ao referencial do marcador.
      * @param elevationMeters deslocamento no eixo da **normal do marcador** (o
      *   "Elevação Z" da interface; −0,5 a +0,5 m).
+     * @param offsetMeters deslocamento do arrasto, em metros, nos eixos do marcador (veja
+     *   `InteractiveInput.panOffset`): **X** = largura da figura e **Y** = a normal (o
+     *   frente–trás). Entra somado à ancoragem e **não** gira com os cursores de rotação.
      */
     fun worldMatrix(
         markerPose: Pose,
@@ -75,42 +165,51 @@ object ModelPlacement {
         sizeMeters: Float,
         rotationDegrees: Vec3,
         elevationMeters: Float,
-        offsetMeters: Vec3 = Vec3.ZERO,
+        offsetMeters: Vec3 = Vec3(0f, 0f, 0f),
     ): FloatArray {
         val scale = scaleFor(metrics, sizeMeters)
-        val anchor = metrics.anchorPosition(scale = scale, elevationMeters = elevationMeters)
 
-        // O deslocamento do arrasto entra **na ancoragem**: ele é um movimento no plano da
-        // figura (X e Y do marcador), somado ao que a ancoragem já faz para centralizar e
-        // apoiar o modelo. Fica junto da ancoragem — e não dentro da rotação — porque o
-        // usuário arrasta o modelo NO PLANO da figura, e não em torno do próprio eixo.
+        // A ancoragem é calculada sobre a caixa do arquivo **já orientada** ([orientedBounds]): ela
+        // trabalha no referencial do marcador e é a orientação que decide qual face do modelo apoia
+        // no plano da figura (com o −90° em X, é o **fundo** do arquivo — o −Z dele).
+        val placed = orientedBounds(metrics, MODEL_ORIENTATION)
+        val anchor = placed.anchorPosition(scale = scale, elevationMeters = elevationMeters)
+
+        // O deslocamento do arrasto entra **na ancoragem**: é uma translação nos eixos do
+        // marcador — a largura (X) e o frente–trás (Y, a normal; veja `InteractiveInput`) —
+        // somada ao que a ancoragem já faz para centralizar e apoiar o modelo. Fica junto da
+        // ancoragem, e não dentro da rotação, porque o usuário move o modelo **sobre a figura**,
+        // e não em torno do próprio eixo: girar o modelo nos cursores não muda o sentido em que
+        // ele anda no arrasto.
         val placement = Vec3(
             x = anchor.x + offsetMeters.x,
             y = anchor.y + offsetMeters.y,
             z = anchor.z + offsetMeters.z,
         )
 
-        // Local: translação (ancoragem + arrasto) · rotação do usuário · escala.
+        // Local: translação (ancoragem + arrasto) · ORIENTAÇÃO DO ARQUIVO · rotação do usuário ·
+        // escala.
         //
-        // Não há rotação de apoio — e essa é a correção da decisão 34: o "para cima" do arquivo
-        // (o +Y do glTF) **é** a normal do marcador no referencial do ARCore, que é o que o
-        // `solvePnP` produz (veja `MarkerDetector.markerObjectPointsMat`, em que o Y é **zero**
-        // nas quatro quinas). O modelo já carrega de pé sobre a figura, o zero dos sliders é
-        // "em pé" e girar a folha impressa gira o modelo em torno de si mesmo, sem deitá-lo.
+        // A ordem é o que dá sentido ao painel: os cursores giram o modelo nos eixos do PRÓPRIO
+        // arquivo (X = largura, Y = "para cima", Z = o "frente") — os eixos que [MODEL_ORIENTATION]
+        // leva ao referencial do marcador —, então "Rotação Z" gira em torno do eixo que sai da
+        // folha (a normal), que é o que o usuário vê.
         //
-        // A versão anterior girava 90° em X aqui, supondo o plano do marcador em XY: o "para
-        // cima" do modelo caía DENTRO do plano (no eixo Z, altura na imagem) e, ao girar a folha
-        // pela normal, o modelo girava em torno do eixo errado — o defeito relatado em campo.
+        // A **orientação do arquivo** é a peça que faltava aqui (decisão 38): sem ela a
+        // correspondência era a identidade e o "para cima" do arquivo (+Y) caía na **normal** do
+        // marcador. Numa folha de frente para a webcam — a situação do desktop — a normal é
+        // horizontal: o modelo carregava **deitado de costas** e o giro da folha o rodava no eixo
+        // errado (o próprio Y), em vez do eixo correspondente. Com ela, o plano XY do arquivo (a
+        // face do modelo) é o plano da figura e o +Z do arquivo (no `House.glb` de referência, a
+        // face da frente) cai na normal: o modelo aparece **de pé, olhando para quem está vendo**, e
+        // acompanha o giro da folha eixo por eixo.
         val local = multiply(
             translation(placement),
-            multiply(eulerRotation(rotationDegrees), uniformScale(scale)),
+            multiply(MODEL_ORIENTATION, multiply(eulerRotation(rotationDegrees), uniformScale(scale))),
         )
 
         return multiply(markerPoseToMatrix(markerPose), local)
     }
-    // O apoio de 90° saiu na decisão 34: o "para cima" do arquivo (+Y) **é** a normal do
-    // marcador, então o modelo carrega de pé e não há rotação a aplicar (veja o comentário
-    // do `local` acima).
 
     /**
      * Rotação a partir dos ângulos do painel.

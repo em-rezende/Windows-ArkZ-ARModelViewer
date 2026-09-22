@@ -62,14 +62,15 @@ class SceneFrame(
     val rowBytes: Int get() = width * 4
 
     /**
-     * O mesmo quadro com as linhas **invertidas** — o que o `readPixels` do Filament
-     * devolve vem de baixo para cima (convenção do OpenGL), e o Compose desenha de cima
-     * para baixo.
+     * O mesmo quadro com as linhas **invertidas**.
      *
-     * Fica aqui, fora do backend, porque é a conta que **todo** backend precisa fazer
-     * igual: inverter duas vezes (ou nenhuma) só aparece como imagem de cabeça para baixo
-     * na tela, e ter um único lugar para isso é o que evita o defeito voltar num backend
-     * novo.
+     * É uma ferramenta da convenção de linhas, e **não** um passo do caminho de desenho: o
+     * `readPixels` do Filament entrega o quadro **de cima para baixo** neste backend (Vulkan —
+     * medido, e guardado pelos dois sentidos em `FilamentRendererTest`: o do **vídeo** e o do
+     * **modelo**), e inverter aqui deixava o **modelo de cabeça para baixo em relação ao vídeo** —
+     * a decisão 39. Fica fora do backend porque a conta é a mesma em qualquer um, e porque
+     * inverter duas vezes (ou nenhuma) aparece só como imagem de cabeça para baixo na tela, sem
+     * erro nenhum.
      */
     fun flippedVertically(): SceneFrame {
         val flipped = ByteArray(rgba.size)
@@ -106,14 +107,19 @@ class RenderScene(
     val model: PreparedModel? = null,
     /** Tamanho da maior dimensão do modelo, em metros. */
     val sizeMeters: Float = DEFAULT_SIZE_METERS,
-    /** Rotação dos sliders, em graus, nos eixos do referencial do marcador. */
-    val rotationDegrees: Vec3 = Vec3.ZERO,
+    /**
+     * Rotação dos sliders, em graus, nos eixos do **arquivo** (X = largura, Y = "para cima",
+     * Z = o "frente") — os mesmos que o `ModelPlacement.MODEL_ORIENTATION` leva ao referencial
+     * do marcador. Zero = "em pé, com a face olhando para quem vê", que é como o modelo carrega.
+     */
+    val rotationDegrees: Vec3 = DEFAULT_ROTATION_DEGREES,
     /** "Elevação Z": deslocamento na normal do marcador, em metros. */
     val elevationMeters: Float = 0f,
     /**
-     * Deslocamento do arrasto (etapa 6), no **plano da figura** — X e Y do marcador, em
-     * metros. É o que o "modo livre" faz: tirar o modelo do centro da figura e pô-lo ao
-     * lado, sobre a mesa.
+     * Deslocamento do arrasto (etapa 6), em metros, no referencial do marcador: **X** é a
+     * largura da figura e **Y** é a normal — o **frente–trás**. É o que o "modo livre" faz:
+     * tirar o modelo do centro da figura, pô-lo ao lado (X) e trazê-lo para a frente ou
+     * afastá-lo (Y), **sem** mexer na altura NA imagem (Z) — decisão 36.
      */
     val offsetMeters: Vec3 = Vec3.ZERO,
 ) {
@@ -163,18 +169,30 @@ class RenderScene(
         const val DEFAULT_SIZE_METERS = 0.2f
 
         /**
-         * Rotação com que o modelo é ancorado, em graus, nos eixos do marcador.
+         * Rotação com que o modelo é ancorado, em graus, nos eixos do **arquivo**.
          *
-         * **+90° em X**, e não zero: os arquivos desta família (CAD/SketchUp, e tudo o que o
-         * Assimp converte de `.obj`/`.stl`/`.ply`/`.3mf`) têm o **Z para cima**, e sem esta
-         * rotação o modelo carrega **deitado** sobre a figura — obrigando a girar o cursor X à
-         * mão em cada modelo carregado. É o **mesmo número** que se usa no app Android para os
-         * mesmos arquivos.
+         * **Zero** — e, com a correspondência de eixos de `ModelPlacement.MODEL_ORIENTATION`, zero
+         * é o estado "**em pé, com a face olhando para quem está vendo**": o **+Y** do arquivo (a
+         * altura) vai para a **altura NA imagem** e o **+Z** do arquivo (o "frente" — no
+         * `House.glb` do repositório, a **face da porta vermelha**) cai na **normal** do marcador.
          *
-         * É só o valor **inicial** (o que o cursor mostra ao abrir e para onde o "Redefinir"
-         * volta): o usuário continua livre para ajustar X, Y e Z a partir dele.
+         * **A história, porque ela custa a repetir.** Da 1.0.5 à 1.0.6 valeu **90° em X**, com a
+         * premissa de que estes arquivos teriam o **Z para cima** — premissa que a medição desfez
+         * (o "para cima" dos modelos do repositório é o **+Y**; decisão 37). A 1.0.7 tirou os 90° e
+         * ficou com a correspondência de **identidade**, o que punha o +Y do arquivo na **normal**
+         * do marcador: com a folha **deitada na mesa** (normal vertical) o modelo aparecia de pé —
+         * e com a folha **de frente para a webcam**, que é a situação do desktop (o marcador na mão
+         * ou apoiado à frente do monitor), ele aparecia **deitado de costas** e, girada a folha em
+         * torno da própria normal, girava em torno do **próprio Y**, e não do eixo correspondente.
+         * A **decisão 38** fechou a correspondência: o plano XY do arquivo **é** o plano da figura e
+         * o +Z do arquivo **é** a normal.
+         *
+         * É só o valor **inicial** — o que o cursor mostra ao abrir e para onde o "Redefinir" volta.
+         * Um arquivo com outro eixo para cima continua pedindo o cursor correspondente: com esta
+         * correspondência, um arquivo exportado com o **+Z para cima** fica de pé com **−90°** no
+         * cursor X (há teste para isso em `ModelPlacementTest`).
          */
-        val DEFAULT_ROTATION_DEGREES: Vec3 = Vec3(90f, 0f, 0f)
+        val DEFAULT_ROTATION_DEGREES: Vec3 = Vec3.ZERO
 
         /**
          * Faixa do tamanho do modelo, em metros — a mesma do app Android

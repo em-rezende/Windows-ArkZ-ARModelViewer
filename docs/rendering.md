@@ -58,22 +58,52 @@ partir das quatro quinas do objeto (`MarkerDetector.markerObjectPointsMat`, em q
 dela o código supunha o plano em XY, e o modelo girava em torno do eixo errado quando a folha
 impressa girava.
 
+E, sobre ele, o app fixa a correspondência com o referencial do **arquivo** (a decisão 38): o
+**plano XY do arquivo** (a face do modelo — no `House.glb` de referência, a face em que fica a porta)
+vermelha) **é** o plano da figura, e o **+Z do arquivo** (o "frente") **é** a normal do marcador.
+Na prática:
+
+| Eixo do arquivo (glTF) | Vai para | Onde ele aparece |
+|---|---|---|
+| **+X** | **+X** do marcador | a largura da figura (para a direita) |
+| **+Y** (a altura) | **−Z** do marcador | a **altura NA imagem**, para cima |
+| **+Z** (o "frente") | **+Y** do marcador | a **normal** — a face olha para quem vê |
+
+Sem essa correspondência — com a identidade, que valeu até a 1.0.7 — o **+Y** do arquivo caía na
+**normal**: com a folha **apoiada na mesa** (normal vertical) o modelo aparecia de pé, mas com a
+folha **de frente para a webcam**, que é a situação do desktop, ele aparecia **deitado de costas**
+e girava no eixo errado quando a folha era girada. É a correção da decisão 38, e o desenho dela
+está no KDoc de `ModelPlacement.MODEL_ORIENTATION` (com a ancoragem calculada sobre a caixa já
+orientada, em `ModelPlacement.orientedBounds`).
+
 * **câmera**: +X para a direita, +Y para cima, olhando para **−Z** (um ponto à frente tem z
   negativo);
 * **marcador**: +X = largura da imagem, **+Y = a normal** e **+Z = altura NA imagem** (para
-  baixo). O **plano da figura é o XZ**, e é por isso que a **elevação** — o controle chamado
-  `Elevação Z` na interface, nome herdado do app Android — é o único ajuste que tira o modelo
-  do plano: ela desloca o modelo ao longo da normal, que é o eixo **Y**.
+  baixo). O **plano da figura é o XZ**, e os dois ajustes que tiram o modelo dele andam no eixo
+  **Y** (a normal): a **elevação** — o controle chamado `Elevação Z` na interface, nome herdado
+  do app Android, e que com a correspondência da decisão 38 passa a ser o **+Z do arquivo** — e o
+  **arrasto vertical**, que é o frente–trás (decisão 36). O **arrasto
+  horizontal** anda na largura da figura (X). O Z da figura **não** entra em gesto nenhum: com a
+  figura de frente para o usuário ele é o eixo vertical do mundo, e era ele que fazia o arrasto
+  vertical subir e descer o modelo em vez de movê-lo para a frente e para trás.
 
 > **Cuidado com a pose "identidade" ao escrever testes**: um marcador com rotação de
 > identidade fica **de perfil** para a câmera (o plano dele contém a direção de visão). Um
 > marcador de frente para a câmera tem a rotação que leva o **+Y** dele (a normal) ao **+Z** do
 > mundo. Um teste chegou a medir "zero pixel de modelo" por causa disso — a pose precisa ser
-> fisicamente possível.
+> fisicamente possível. Nas contas escritas à mão, lembre-se de que os eixos do marcador **no
+> mundo** são as **colunas** da rotação da pose (o `Pose` guarda a rotação em ordem de **linha** e
+> a aplica como `mundo = R · ponto`).
 
-A conta do modelo é `mundo = pose do marcador ∘ [ancoragem · rotação · escala]`, com a
-escala normalizando a maior dimensão do arquivo para o tamanho escolhido (0,2 m por
-padrão, o mesmo do Android).
+A conta do modelo é `mundo = pose do marcador ∘ [ancoragem · ORIENTAÇÃO DO ARQUIVO · rotação do
+usuário · escala]`, com a escala normalizando a maior dimensão do arquivo para o tamanho escolhido
+(0,2 m por padrão, o mesmo do Android).
+
+> **A consequência, medida:** o modelo é um objeto **colado à figura** — não é orientado pela
+> vertical do mundo. Com a folha apoiada na mesa ele fica **deitado com a face para cima** (o teste
+> `com a folha apoiada na mesa o modelo fica deitado com a face para cima`, em `ModelPlacementTest`).
+> Um modo "vertical do mundo", que o manteria de pé com a folha em qualquer inclinação, fica
+> registrado como **possibilidade** nas decisões 37 e 38 — e não como pendência.
 
 ## 3. Os modelos: seis formatos, um caminho de desenho
 
@@ -137,7 +167,7 @@ Três testes desenham **de verdade** na GPU e conferem os pixels
 | Teste | O que ele pega |
 |---|---|
 | fundo com metade vermelha em cima e azul embaixo | vídeo de cabeça para baixo, canais trocados, plano do tamanho errado |
-| modelo ancorado no marcador, **iluminado**, e ausente sem rastreio | gltfio, matriz de ancoragem, luzes e a regra do rastreio |
+| modelo ancorado no marcador, **iluminado**, **no mesmo sentido do vídeo** e ausente sem rastreio | gltfio, matriz de ancoragem, luzes, o sentido das linhas (decisão 39) e a regra do rastreio |
 | redimensionar o quadro e trocar de modelo | ciclo de vida do `SwapChain` e do asset |
 
 Os quadros são pequenos (64×64 e 96×96) de propósito: o que está em teste é a **cadeia**,
@@ -179,9 +209,20 @@ Se a medição em uso real mostrar espera, o caminho natural é ler o quadro ant
 o novo é desenhado — a mudança é interna ao renderizador, porque a interface já recebe um
 quadro por chamada.
 
-A barra de menus, os ajustes em tempo real e a linha de estado (etapa 5) e os gestos de zoom
-e arrasto (etapa 6) estão fechados e conferidos em uso real; continuam abertas as etapas 7
-(captura de tela sem interface, com as três qualidades) e 8 (instalador `.msi`). O **backend
+**O quadro sai no sentido em que o motor o entrega** (decisão 39): o `readPixels` do Filament devolve as
+linhas **de cima para baixo** neste backend (Vulkan, medido), e é o **plano de fundo** que se ajusta a
+isso — as coordenadas de textura do quad põem a linha de cima da imagem no topo do mundo (`v = 1` lá,
+porque o `v` do Filament conta a textura de baixo para cima). Inverter as linhas na leitura **e** trocar o
+`v` do vídeo (o que o código fazia até a 1.0.7) também deixa o **vídeo** certo — e é o defeito mais difícil
+de ver do projeto: as duas inversões se cancelam para o vídeo e deixam o **modelo**, que é ancorado no
+**mundo**, **de cabeça para baixo**. Enquanto o modelo carregava deitado o espelho caía no plano horizontal
+e não aparecia; com o modelo de pé (decisão 38) ele ficou à vista. O teste que guarda isso mede **onde** o
+modelo cai *em relação ao vídeo*, com deslocamentos conhecidos nos eixos do marcador
+(`FilamentRendererTest`) — e não só "se ele apareceu".
+
+A barra de menus, os ajustes em tempo real e a linha de estado (etapa 5), os gestos de zoom
+e arrasto (etapa 6), a **captura de tela sem interface nas três qualidades** (etapa 7) e o
+**instalador `.msi`** (etapa 8, jpackage + WiX) estão fechados e conferidos em uso real. O **backend
 alternativo em LWJGL/OpenGL** deixou de ser necessário: ele era o plano B para o caso de o
 binding comunitário do Filament não funcionar, e os testes de GPU provaram que ele funciona.
 O `SceneRenderer` continua sendo uma interface justamente para que esse plano B siga barato,
@@ -201,7 +242,7 @@ plataforma:
 | `Ctrl`+roda | rolagem com `Ctrl` | zoom; a área do vídeo consome o evento (decisão 20) |
 | Teclado | `+` / `=` / `-` | zoom por passo |
 | Botões `−` e `+` | clique | zoom por passo — é o caminho de quem usa tela sensível ao toque |
-| Arrastar | botão esquerdo pressionado e movido | deslocamento do modelo **no plano** do marcador |
+| Arrastar | botão esquerdo pressionado e movido | deslocamento do modelo na **largura** (X) e no **frente–trás** (Y, a normal) — decisão 36 |
 | Pinça de dois dedos na tela sensível ao toque | **não chega**: o Windows entrega o toque como mouse, de um contato só | nada (decisão 31) |
 
 O log registra quantos pontos estão em contato com o vídeo, **a cada mudança**

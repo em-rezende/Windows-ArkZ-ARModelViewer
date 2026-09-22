@@ -55,24 +55,32 @@ class ModelMetrics(
      * NA imagem**. É o mesmo referencial dos nomes `extentX`/`extentZ` do `AugmentedImage`,
      * mantido de propósito para que a conta do app Android valha sem alteração.
      *
-     * Com ele, o "para cima" do arquivo (**+Y**, a convenção do glTF) **já é a normal do
-     * marcador** — e é por isso que não existe rotação de apoio: o modelo carrega de pé.
-     *
      * Logo:
      *  - `x = -center.x * scale` → centraliza na largura da figura;
-     *  - `y = -(center.y - halfExtent.y) * scale + elevationMeters` → apoia a **base** do
-     *    modelo no plano (este é o eixo da normal) e soma a **elevação**, o único deslocamento
-     *    que tira o modelo do plano;
+     *  - `y = -(center.y - halfExtent.y) * scale + elevationMeters` → apoia a face de **trás** do
+     *    modelo no plano (este é o eixo da normal — o único em que o modelo sai do plano) e soma a
+     *    **elevação**, o único deslocamento que tira o modelo da figura;
      *  - `z = -center.z * scale` → centraliza na altura NA imagem.
      *
      * Tudo multiplicado pela escala atual, de modo que o alinhamento acompanha o slider de
      * tamanho e a escala automática.
      *
-     * > **Histórico (decisão 34 do roadmap).** A primeira versão desta função trocou Y e Z,
-     * > acreditando que o plano do marcador fosse XY. O defeito apareceu com o marcador na mão:
-     * > girando a folha pela normal, o "para cima" do modelo (que caía dentro do plano) girava
-     * > em torno do eixo errado — o modelo deitava. O referencial correto é o de cima, e
-     * > `ModelPlacementTest` gira a folha e cobra que o modelo continue de pé.
+     * > **A caixa tem de chegar JÁ ORIENTADA** — é `ModelPlacement.orientedBounds` que faz isso.
+     * > Esta conta supõe o modelo **de pé e com a face olhando para quem vê**: assim o **Y** da
+     * > caixa é a **espessura** do modelo (o que entra e sai do plano, o que a ancoragem apoia) e o
+     * > **Z** é a **altura dele na imagem**. Enquanto a correspondência entre o arquivo e o marcador
+     * > era a identidade (até a 1.0.7) a caixa crua do arquivo já servia; desde a **decisão 38**
+     * > não serve — o +Y do arquivo é a **altura do modelo**, e usá-lo aqui apoiaria a face errada:
+     * > o modelo ficaria metade à frente e metade atrás da figura.
+     *
+     * > **Histórico (decisões 34, 37 e 38 do roadmap).** A primeira versão desta função trocou Y e
+     * > Z, acreditando que o plano do marcador fosse XY. O defeito apareceu com o marcador na mão:
+     * > girando a folha pela normal, o "para cima" do modelo (que caía dentro do plano) girava em
+     * > torno do eixo errado — o modelo deitava. Depois disso a correspondência ficou na
+     * > identidade (1.0.7), o que dava "em pé" **só** com a folha deitada na mesa. A decisão 38
+     * > fixou a correspondência entre o arquivo e o marcador; `ModelPlacementTest` cobra as duas
+     * > coisas: o modelo **de pé, com a face para quem olha**, e o giro da folha girando o modelo
+     * > no eixo correspondente.
      */
     fun anchorPosition(scale: Float, elevationMeters: Float): Vec3 = Vec3(
         x = -center.x * scale,

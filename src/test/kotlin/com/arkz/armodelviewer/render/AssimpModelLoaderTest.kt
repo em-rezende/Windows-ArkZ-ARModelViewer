@@ -73,7 +73,9 @@ class AssimpModelLoaderTest {
 
     @Test
     fun `um arquivo glTF nao precisa de conversao`() {
-        val source = copyModel("Edificio.glb")
+        // O `House.glb` (o modelo de referência do repositório) é um glTF de verdade: o Filament
+        // lê direto, sem passar pelo Assimp.
+        val source = copyModel("House.glb")
 
         val prepared = AssimpModelLoader.prepare(source).getOrThrow()
 
@@ -81,6 +83,28 @@ class AssimpModelLoaderTest {
         assertEquals(source, prepared.loadFile)
         assertTrue(prepared.bounds.largestDimension > 0f, "medida: ${prepared.bounds}")
         assertTrue(prepared.meshCount > 0)
+    }
+
+    @Test
+    fun `o House glb de referencia tem a altura no Y e o teto no topo`() {
+        // O modelo de referência do repositório — o `House.glb` do Blender, na pasta `3d_models`,
+        // **re-exportado em +Y para cima** (o relato de campo que abriu a decisão 38): a casa de
+        // 5,0 × 5,0 × 4,5 unidades, **centrada na origem** (o chão em y = −2,5 e o telhado em
+        // y = +2,5), com a porta vermelha na face do X e o cubo verde-amarelo no alto do telhado.
+        // É esta medida que sustenta a correspondência de eixos do `ModelPlacement` (decisão 38):
+        // o **+Y do arquivo é a altura**. Qual face fica virada para quem olha depende da rotação
+        // do modelo (o zero dos cursores deixa a face do **+Z** para a câmera), e quem mede isso é
+        // o teste de GPU `o modelo aparece ancorado no marcador e some sem rastreio`.
+        val prepared = AssimpModelLoader.prepare(copyModel("House.glb")).getOrThrow()
+        val bounds = prepared.bounds
+
+        assertFalse(prepared.converted, "glTF é lido direto pelo Filament")
+        assertEquals(5.0f, bounds.max.x - bounds.min.x, 1e-3f, "largura (5,0)")
+        assertEquals(5.0f, bounds.max.y - bounds.min.y, 1e-3f, "altura no Y (5,0)")
+        assertEquals(4.5f, bounds.max.z - bounds.min.z, 1e-3f, "profundidade (4,5)")
+        assertEquals(2.5f, bounds.max.y, 1e-2f, "o telhado está no topo do Y (+2,5)")
+        assertEquals(-2.5f, bounds.min.y, 1e-2f, "e o chão da casa é o y = −2,5 (a casa é centrada)")
+        assertEquals(4, prepared.meshCount, "a casa, a porta, o cubo do telhado e a face amarela dele")
     }
 
     @Test

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.arkz.armodelviewer"
-val appVersion = "1.0.5"
+val appVersion = "1.0.7"
 version = appVersion
 
 // Nome do pacote — fonte única, como a versão: o empacotamento precisa dele para saber onde a
@@ -194,6 +194,11 @@ compose.desktop {
                 iconFile.set(layout.projectDirectory.file("src/main/resources/icons/Ark-Z_Logo.ico").asFile)
                 // Identificador fixo de versão: permite ao Windows ATUALIZAR uma
                 // instalação anterior em vez de criar uma segunda entrada.
+                upgradeUuid = "5b1f0c62-9a3d-4e77-8f21-6d4c0a7e93b8"
+            }
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Runtime do Visual C++ ao lado do executável.
@@ -262,10 +267,4 @@ tasks.register<JavaExec>("modelCheck") {
     // comando receber o `toString()` dele ("or(provider(?), fixed(...))") — foi o que aconteceu na
     // primeira execução, e o relatório do diagnóstico registrou o caminho esquisito.
     args("--check-model", providers.gradleProperty("modelo").getOrElse("3d_models/ArkZ_logo.obj"))
-}
-
-                upgradeUuid = "5b1f0c62-9a3d-4e77-8f21-6d4c0a7e93b8"
-            }
-        }
-    }
 }

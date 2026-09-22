@@ -16,7 +16,7 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 * **Câmera + visão computacional:** [OpenCV via JavaCV/Bytedeco](https://github.com/bytedeco/javacv)
 * **Conversão de formatos não-glTF:** [Assimp](https://github.com/assimp/assimp) pelo binding oficial do [LWJGL](https://www.lwjgl.org)
 
-> **Estado atual: etapas 0 a 6 concluídas e conferidas em uso real** (webcam, marcador
+> **Estado atual: etapas 0 a 9 concluídas e conferidas em uso real** (webcam, marcador
 > impresso e modelo ancorado, no notebook do cliente): o esqueleto, a lógica portável com
 > i18n completo (8 idiomas, 116 chaves), a **câmera**, a **detecção de marcador com caixa
 > ciano** (mesma interface do `AugmentedImage` do ARCore), a **ancoragem do modelo** (com a
@@ -26,13 +26,24 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 > Idioma, Ajuda, Sair), os **ajustes em tempo real** num diálogo arrastável (com o botão
 > Redefinir), a **escala automática**, o **gerenciamento de marcador**, o **modo tela cheia**
 > e o **zoom/arrasto** por roda, `Ctrl`+roda, teclado, botões `−`/`+`, pinça de touchpad e
-> arrasto com o mouse. **201 testes unitários verdes**, três deles conferindo os **pixels** de
-> quadros desenhados na GPU. O pacote portátil e o diagnóstico de modelo por linha de comando
-> estão em [`docs/development.md`](docs/development.md); o roadmap completo, com critérios de
+> arrasto com o mouse, e o **instalador Windows** (`gradlew packageMsi`). **210 testes unitários
+> verdes**, três deles conferindo os **pixels** de quadros desenhados na GPU. O pacote portátil, o
+> instalador e o diagnóstico de modelo por linha de comando estão em
+> [`docs/development.md`](docs/development.md); o roadmap completo, com critérios de
 > aceite por etapa, em [`docs/roadmap.md`](docs/roadmap.md); a detecção em
 > [`docs/marker-detection.md`](docs/marker-detection.md), a renderização em
 > [`docs/rendering.md`](docs/rendering.md) e as mudanças de cada versão no
 > [`CHANGELOG.md`](CHANGELOG.md).
+
+## Capturas de tela
+
+| Modelo ancorado no marcador | Ajustes do modelo | Gerenciar marcador |
+|---|---|---|
+| ![A janela do aplicativo com o vídeo da webcam, a folha impressa do Marcador A sobre a mesa e o modelo House.glb de pé sobre a figura](assets/image_01.png) | ![O diálogo Ajustes do modelo, com os cursores de tamanho, de rotação X, Y e Z e de elevação Z](assets/image_02.png) | ![O diálogo Gerenciar marcador, com a lista dos marcadores e as ações de criar, salvar para impressão e carregar](assets/image_03.png) |
+| **A janela principal:** vídeo da webcam, caixa do marcador reconhecido, `House.glb` ancorado e a linha de estado com o modelo e o marcador carregados. | **Ajustes do modelo:** tamanho, rotação nos três eixos e elevação, com o botão *Redefinir*. | **Gerenciar marcador:** os marcadores embutidos, o salvamento da imagem para impressão e o marcador criado pelo usuário. |
+
+As três são capturas reais do aplicativo **1.0.7**, na mesma máquina do teste em campo (webcam
+integrada, folha impressa do **Marcador A** apoiada na mesa).
 
 ## Requisitos
 
@@ -41,7 +52,8 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 | Windows | 10 ou 11 (x64) |
 | JDK | **25** (toolchain do Gradle) — o Filament no desktop exige **Java 22+**, porque o binding usa FFM (Project Panama) |
 | Gradle | 9.7.1 (vem pelo wrapper) |
-| WiX Toolset | 3.14+ (ou WiX 4/5) — apenas para gerar o `.msi` |
+| WiX Toolset | **nenhum a instalar** — o plugin do Compose baixa o WiX 3.11 sozinho na primeira vez que o `.msi` é gerado (`build/wix311`) |
+| Visual C++ Redistributable | 2015-2022 — **só para quem instala pelo `.msi`**: o instalador monta a própria imagem e não leva as três DLLs que o pacote portátil leva ao lado do `.exe` |
 | Webcam | integrada ou USB |
 
 > O Gradle **baixa o JDK 25 sozinho** quando a máquina não tem a versão exata (veja
@@ -56,7 +68,7 @@ marcador criado pelo próprio app) e o modelo fica fixo sobre ela.
 .\gradlew.bat test              # testes unitários (JUnit 5)
 .\gradlew.bat run               # abre a janela do app
 .\gradlew.bat -q listCameras    # lista as webcams (índices do OpenCV)
-.\gradlew.bat packageMsi        # instalador .msi (requer o WiX)
+.\gradlew.bat packageMsi        # instalador .msi (o WiX vem na primeira vez)
 ```
 
 O instalador sai em `build/compose/binaries/main/msi/`, com atalho no menu Iniciar,
@@ -75,8 +87,9 @@ monta uma pasta **autossuficiente** (com o JRE junto) em
 `build\compose\binaries\main\app\ArkZ ARModelViewer\`. Copie a pasta inteira (compactada, ~258 MB)
 para o outro computador e execute **`ArkZ ARModelViewer.exe`** dentro dela.
 
-É portátil de propósito: não instala, não cria atalho e não mexe no registro. Também **não precisa
-do WiX Toolset** — o WiX é exigido só pelo `.msi` (etapa 8). Para **desenvolver** no outro
+É portátil de propósito: não instala, não cria atalho e não mexe no registro. Também **não precisa de
+nada instalado** — nem do WiX, que só o `.msi` usa e que o próprio Gradle baixa (etapa 8). Para
+**desenvolver** no outro
 computador, aí sim é preciso o JDK 25 e o `gradlew.bat run`.
 
 É o caminho recomendado para testar num notebook com **touchpad e tela sensível ao toque**. Duas
@@ -279,7 +292,8 @@ Windows - ArkZ ARModelViewer/
 │   ├── i18n/                     # 8 bundles .properties (gerados por tools/)
 │   └── icons/
 ├── src/test/kotlin/…             # JUnit 5 (i18n, marcadores, informações do app)
-├── 3d_models/                    # modelos de teste (os mesmos do projeto Android)
+├── 3d_models/                    # modelos de teste (os mesmos do projeto Android, mais o House.glb)
+├── assets/                       # as capturas de tela usadas neste README
 ├── docs/                         # roadmap, idiomas, desenvolvimento
 ├── tools/                        # scripts PowerShell (assets, idiomas, câmeras…)
 ├── LICENSE · NOTICE              # GPL-3.0 + licenças de terceiros

@@ -43,7 +43,31 @@ import com.arkz.armodelviewer.model.Vec3
  * O deslocamento por pixel é proporcional ao **tamanho atual** do modelo: assim arrastar
  * "uma tela" move o modelo na mesma proporção da tela, quer ele esteja com 5 cm ou com 2 m.
  * O deslocamento é limitado a [MAX_PAN_METERS] para fora do centro da figura — o suficiente
- * para pôr o modelo ao lado ou à frente do marcador, sem o risco de perdê-lo de vista.
+ * para pôr o modelo ao lado da figura ou à frente dela, sem o risco de perdê-lo de vista.
+ *
+ * ## O arrasto anda na largura (X) e no frente–trás (Y)
+ *
+ * O arrasto do "modo livre" anda nos dois eixos que o usuário vê como "mover o modelo": a
+ * **largura da figura** (o X do marcador, que é o eixo horizontal da imagem) e a **normal do
+ * marcador** (o Y) — que é o **frente–trás**, o eixo que sai do papel na direção de quem olha.
+ *
+ * O eixo **Z** — a "altura NA imagem" — **não** entra no arrasto. Era ele que fazia o arrasto
+ * vertical subir e descer o modelo pelo mundo: com o marcador de frente para o usuário (o caso
+ * do relato em campo) o Z da figura **é** o eixo vertical do mundo, então escrever ali movia o
+ * modelo para cima e para baixo em vez de para a frente e para trás.
+ *
+ * **A medição que fixou isso** (o quadro é sintetizado com a figura real e a pose vem do
+ * detector de verdade — veja `MarkerDetectorTest` e `InteractiveInputTest`): com o "Marcador A"
+ * de frente para a câmera, a 21 cm, a pose entrega **X = largura**, **Y = a NORMAL** e
+ * **Z = altura NA imagem** — e nesta pose o Z da figura aponta para o **chão do mundo**. Um
+ * arrasto vertical de 0,1 m escrito no Z andava **92 mm na vertical do mundo** e só 38 mm em
+ * profundidade: era este o "o modelo sobe e desce" do relato. Escrito no Y, o mesmo arrasto anda
+ * **92 mm frente–trás** (o modelo se aproxima da câmera) e 38 mm na vertical — o pedido.
+ *
+ * O sinal é o da tela: **arrastar para baixo traz o modelo para a frente** (na direção de quem
+ * olha) e arrastar para cima o afasta — o mesmo sentido do cursor de **Elevação**, que também
+ * desloca no Y. O deslocamento continua no referencial do marcador e **não** gira com os
+ * cursores de rotação: quem arrasta o modelo continua movendo-o sobre a figura impressa.
  */
 object InteractiveInput {
 
@@ -58,7 +82,7 @@ object InteractiveInput {
     /** Deslocamento por pixel de arrasto, como fração do tamanho do modelo. */
     const val PAN_FRACTION_PER_PIXEL = 0.002f
 
-    /** Limite do deslocamento no plano da figura, em metros. */
+    /** Limite do deslocamento do arrasto, em metros — na largura (X) e no frente–trás (Y). */
     const val MAX_PAN_METERS = 0.5f
 
     /**
@@ -89,18 +113,20 @@ object InteractiveInput {
     }
 
     /**
-     * Deslocamento do modelo no **plano da figura**, a partir de um arrasto em pixels da tela.
+     * Deslocamento do modelo a partir de um arrasto em pixels da tela.
      *
-     * O plano do marcador são os eixos **X (largura)** e **Z (altura NA imagem)**; o eixo **Y é
-     * a normal**, e o arrasto **não** o toca: arrastar nunca tira o modelo do papel (decisão 34).
-     * Este é o mesmo referencial de `ModelMetrics.anchorPosition` — o do ARCore, e o que o
-     * `solvePnP` produz.
+     * O arrasto anda em **dois eixos do marcador** (o referencial do ARCore, o mesmo do
+     * `ModelMetrics.anchorPosition` e o que o `solvePnP` produz):
      *
-     * O sinal do eixo vertical foi **corrigido pelo teste em campo** (decisão 21) e reconferido
-     * depois da correção do referencial (decisão 34): arrastar o mouse para cima **traz** o
-     * modelo para a frente na figura, e arrastar para baixo o afasta — a expectativa de quem
-     * arrasta. A tela cresce para baixo e o Z do marcador também (ele é a "altura NA imagem"),
-     * então os dois eixos apontam para o mesmo lado e o sinal não se inverte no caminho.
+     *  * **X — a largura da figura** (o eixo horizontal da imagem): arrastar para a direita
+     *    leva o modelo para a direita;
+     *  * **Y — a NORMAL**, que é o **frente–trás**: arrastar para baixo **traz** o modelo para a
+     *    frente (na direção de quem olha) e para cima o afasta. É o eixo do cursor de
+     *    **Elevação**, com o mesmo sentido.
+     *
+     * O **Z (a "altura NA imagem") fica em zero**: era ele que fazia o arrasto vertical subir e
+     * descer o modelo pelo mundo quando a figura está de frente para o usuário — a medição e a
+     * decisão 36 estão no KDoc deste objeto.
      *
      * @param current deslocamento atual, em metros.
      * @param dxPixels arrasto horizontal (pixels; positivo = para a direita).
@@ -118,8 +144,8 @@ object InteractiveInput {
 
         return Vec3(
             x = (current.x + dxPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
-            y = 0f,
-            z = (current.z + dyPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
+            y = (current.y + dyPixels * metersPerPixel).coerceIn(-MAX_PAN_METERS, MAX_PAN_METERS),
+            z = 0f,
         )
     }
 }
