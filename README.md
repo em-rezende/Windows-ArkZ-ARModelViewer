@@ -147,6 +147,46 @@ a caixa ciano aparece assim que a figura é reconhecida, e a barra de status mos
 "Marcador detectado: Marcador A — carregue um modelo 3D para exibi-lo" (o mesmo texto do
 app Android, ainda sem modelo porque isso entra na etapa 4).
 
+## Modelos 3D de exemplo (`3d_models/`)
+
+Cinco arquivos versionados junto com o código — e **nenhum deles entra no aplicativo**: são os
+modelos usados pelos testes que leem arquivo de verdade (`AssimpModelLoaderTest` e
+`FilamentRendererTest`), os exemplos do diagnóstico por linha de comando
+(`gradlew.bat modelCheck -Pmodelo=…`) e o `House.glb` é o modelo que aparece nas **capturas deste
+README**. O `.gitattributes` os marca como **binários**, para a normalização de fim de linha nunca
+corromper o conteúdo.
+
+| Arquivo (o nome é o endereço de download) | Formato | Tamanho | SHA-256 |
+|---|---|---|---|
+| [`ArkZ_logo.glb`](https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models/ArkZ_logo.glb) | glTF 2.0 binário | 65.628 bytes (64,09 KiB) | `493D580E1B7E27A20FD213D4BEC394A4C3C350E546569FA7B53EC99A9E5B8C74` |
+| [`ArkZ_logo.obj`](https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models/ArkZ_logo.obj) | Wavefront OBJ (texto) | 48.711 bytes (47,57 KiB) | `7015E67AF35161EE8B212CA78A1642576C17B89204EA15F83A20DFC123FB9A0C` |
+| [`ArkZ_logo.ply`](https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models/ArkZ_logo.ply) | PLY binário little-endian | 19.342 bytes (18,89 KiB) | `DB8332541307A8E265DE7EDDE3977A3C4B27759E597982AA9D40EED4F4CE3E5C` |
+| [`ArkZ_logo.stl`](https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models/ArkZ_logo.stl) | STL binário (1.498 triângulos) | 74.984 bytes (73,23 KiB) | `EB86C23EB72F595BD396E979ACB547096DFE8322265EA9F6517FB4EFFCE7FB83` |
+| [`House.glb`](https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models/House.glb) | glTF 2.0 binário | 7.704 bytes (7,52 KiB) | `596B44540C08E75BDFF269454A182C28694FF44BDC7450A3833934BE40A8EDB1` |
+
+O logotipo está nas **quatro extensões** do mesmo modelo (exportado do Blender): é com ele que a
+suíte confere que a conversão pelo **Assimp** entrega a **mesma medida** em `.obj`, `.ply` e `.stl`,
+e que um `.glb` carrega **direto**, sem conversão. O `House.glb` é a **casa de referência** dos
+testes de GPU — **5,0 × 4,5 × 5,0** unidades, com o chão em `y = 0`, o telhado no topo do **Y** e a
+porta vermelha na face do **+Z** (a que a correspondência de eixos leva para a normal, virada para
+quem olha). É essa medida que a decisão 38 usa e é ela que o teste de GPU cobra em **pixel**.
+
+Os endereços de download têm todos a **mesma base** — `/main/3d_models/` — com o nome do arquivo (o
+link da tabela) no fim, então dá para baixar a pasta inteira de uma vez e conferir cada hash com o
+`Get-FileHash`, que é quem produz a coluna SHA-256 da tabela:
+
+```powershell
+$modelos = "ArkZ_logo.glb", "ArkZ_logo.obj", "ArkZ_logo.ply", "ArkZ_logo.stl", "House.glb"
+$base = "https://raw.githubusercontent.com/em-rezende/Windows-ArkZ-ARModelViewer/main/3d_models"
+foreach ($modelo in $modelos) { Invoke-WebRequest "$base/$modelo" -OutFile $modelo }
+
+Get-FileHash .\House.glb -Algorithm SHA256   # 596B4454…0A8EDB1
+```
+
+> A pasta também trazia o `Edificio.glb` (o prédio de 1.358.704 bytes): esteve no repositório da
+> **1.0.0** à **1.0.6** e saiu na **1.0.7**. Nenhum teste, documento ou captura apontava para ele —
+> quem faz o papel de modelo de referência é o `House.glb`, de 7,5 KiB.
+
 ---
 
 ## Decisões técnicas (e o que foi verificado)
@@ -306,7 +346,7 @@ Windows - ArkZ ARModelViewer/
 │   ├── i18n/                     # 8 bundles .properties (gerados por tools/)
 │   └── icons/
 ├── src/test/kotlin/…             # JUnit 5 (i18n, marcadores, informações do app)
-├── 3d_models/                    # modelos de teste (os mesmos do projeto Android, mais o House.glb)
+├── 3d_models/                    # 5 modelos de exemplo: o logotipo em .glb/.obj/.ply/.stl e o House.glb
 ├── assets/                       # as capturas de tela usadas neste README
 ├── docs/                         # roadmap, idiomas, desenvolvimento
 ├── tools/                        # scripts PowerShell (assets, idiomas, câmeras…)

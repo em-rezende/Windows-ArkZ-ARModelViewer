@@ -89,6 +89,11 @@ tasks.test {
     // O Filament no desktop é acessado por FFM (Project Panama): sem esta opção o JVM
     // recusa o acesso nativo que as bibliotecas usam.
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+    // Os modelos de `3d_models/` são lidos **em tempo de execução** pelos testes de modelo
+    // (`AssimpModelLoaderTest`, `FilamentRendererTest`): sem declará-los como entrada, o Gradle
+    // não veria a troca de um `.glb`/`.obj` e devolveria o resultado antigo do build cache — a
+    // suíte apareceria "verde" com o modelo velho.
+    inputs.dir(layout.projectDirectory.dir("3d_models"))
     testLogging {
         events("passed", "skipped", "failed")
         // Mostra a saída dos testes: os diagnósticos das bibliotecas NATIVAS (Filament,

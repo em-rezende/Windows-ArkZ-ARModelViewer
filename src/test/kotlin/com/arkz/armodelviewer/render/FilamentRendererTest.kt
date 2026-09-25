@@ -86,11 +86,11 @@ class FilamentRendererTest {
             val background = solidFrame(96, 96, red = 40, green = 40, blue = 40)
             val marker = markerOf(TrackingState.TRACKING)
 
-            // A **casa de referência** (`House.glb`, re-exportado do Blender em **+Y para cima**: o
-            // telhado no topo do Y e o cubo verde-amarelo no alto da casa), com os cursores em
-            // zero. Com a correspondência de eixos do `ModelPlacement` (decisão 38) ela aparece
-            // **de pé**, preenchendo a área central — é o quadro que mede a ancoragem, a luz e a
-            // projeção.
+            // A **casa de referência** (`House.glb`, exportado do Blender em **+Y para cima**: o
+            // chão em y = 0, o telhado no topo do Y (+4,5) e a porta vermelha na face do +Z), com
+            // os cursores em zero. Com a correspondência de eixos do `ModelPlacement` (decisão 38)
+            // ela aparece **de pé e de frente**, preenchendo a área central — é o quadro que mede a
+            // ancoragem, a luz, a projeção e a vertical do modelo.
             val house = prepareHouseModel()
             val facing = assertNotNull(
                 renderer.render(
@@ -113,21 +113,24 @@ class FilamentRendererTest {
                 "o modelo tem de estar ILUMINADO (maior canal: ${brightestChannel(facing)})",
             )
 
-            // E a casa tem de estar **de pé**: o **cubo verde-amarelo do telhado** — a única parte
-            // colorida da metade de cima da casa — tem de aparecer **ACIMA** do centro do modelo.
-            // Com o quadro lido invertido (o defeito da decisão 39) ele aparecia abaixo, como o
-            // teste em campo mostrou ("de cabeça para baixo"). A **porta vermelha** fazia esta
-            // medida até o `House.glb` ser re-exportado com a porta na face do X, fora do campo da
-            // câmera de frente; quem mede a vertical agora é o cubo (medido: cubo na linha 37,0
-            // contra 47,5 do modelo, num quadro de 96 × 96).
-            val cubeCentroid = assertNotNull(
-                centroidOf(facing, background) { r, g, b -> g > b + 20 && r > b + 20 },
-                "o cubo do telhado (verde e amarelo) tem de aparecer no quadro",
+            // E a casa tem de estar **de pé**: a **porta vermelha** — a face da frente, que ocupa
+            // a **metade de baixo** da casa (do chão ao meio da parede, no +Z do arquivo) — tem de
+            // aparecer **ABAIXO** do centro do modelo. Com o quadro lido invertido (o defeito da
+            // decisão 39) ela apareceria acima, como o teste em campo mostrou ("de cabeça para
+            // baixo"). A porta voltou a ser quem mede a vertical quando o `House.glb` foi
+            // exportado com a porta na face do **+Z** — antes disso ela ficava na face do X, fora
+            // do campo da câmera de frente, e a medida era feita pelo cubo verde do telhado
+            // (medido com esta exportação: porta na linha 61,1 contra 50,3 do modelo, num quadro
+            // de 96 × 96).
+            val porta = assertNotNull(
+                centroidOf(facing, background) { r, g, b -> r > g + 20 && r > b + 20 },
+                "a porta vermelha (a face da frente, na metade de baixo da casa) tem de aparecer " +
+                    "no quadro",
             )
             val modelCentroid = assertNotNull(centroidOf(facing, background))
             assertTrue(
-                cubeCentroid.second < modelCentroid.second - 3.0,
-                "o cubo do telhado tem de ficar ACIMA do centro do modelo (cubo em ${cubeCentroid.second}, " +
+                porta.second > modelCentroid.second + 3.0,
+                "a porta tem de ficar ABAIXO do centro do modelo (porta em ${porta.second}, " +
                     "modelo em ${modelCentroid.second} linhas)",
             )
 

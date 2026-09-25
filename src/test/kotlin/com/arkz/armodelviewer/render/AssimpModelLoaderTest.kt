@@ -88,23 +88,24 @@ class AssimpModelLoaderTest {
     @Test
     fun `o House glb de referencia tem a altura no Y e o teto no topo`() {
         // O modelo de referência do repositório — o `House.glb` do Blender, na pasta `3d_models`,
-        // **re-exportado em +Y para cima** (o relato de campo que abriu a decisão 38): a casa de
-        // 5,0 × 5,0 × 4,5 unidades, **centrada na origem** (o chão em y = −2,5 e o telhado em
-        // y = +2,5), com a porta vermelha na face do X e o cubo verde-amarelo no alto do telhado.
-        // É esta medida que sustenta a correspondência de eixos do `ModelPlacement` (decisão 38):
-        // o **+Y do arquivo é a altura**. Qual face fica virada para quem olha depende da rotação
-        // do modelo (o zero dos cursores deixa a face do **+Z** para a câmera), e quem mede isso é
-        // o teste de GPU `o modelo aparece ancorado no marcador e some sem rastreio`.
+        // **exportado em +Y para cima** (a convenção que o relato de campo e a decisão 38 fixaram):
+        // a casa de 5,0 × 4,5 × 5,0 unidades (largura × altura × profundidade), com o **chão em
+        // y = 0** e o telhado no topo do Y (y = +4,5), e a **porta vermelha na face do +Z** — a
+        // face que a correspondência de eixos do `ModelPlacement` leva para a normal do marcador,
+        // virada para quem olha. É esta medida que sustenta essa correspondência: o **+Y do
+        // arquivo é a altura**. A vertical no quadro é medida pelo teste de GPU
+        // `o modelo aparece ancorado no marcador e some sem rastreio`, com a porta (a metade de
+        // baixo da casa) contra o centro do modelo.
         val prepared = AssimpModelLoader.prepare(copyModel("House.glb")).getOrThrow()
         val bounds = prepared.bounds
 
         assertFalse(prepared.converted, "glTF é lido direto pelo Filament")
         assertEquals(5.0f, bounds.max.x - bounds.min.x, 1e-3f, "largura (5,0)")
-        assertEquals(5.0f, bounds.max.y - bounds.min.y, 1e-3f, "altura no Y (5,0)")
-        assertEquals(4.5f, bounds.max.z - bounds.min.z, 1e-3f, "profundidade (4,5)")
-        assertEquals(2.5f, bounds.max.y, 1e-2f, "o telhado está no topo do Y (+2,5)")
-        assertEquals(-2.5f, bounds.min.y, 1e-2f, "e o chão da casa é o y = −2,5 (a casa é centrada)")
-        assertEquals(4, prepared.meshCount, "a casa, a porta, o cubo do telhado e a face amarela dele")
+        assertEquals(4.5f, bounds.max.y - bounds.min.y, 1e-3f, "altura no Y (4,5)")
+        assertEquals(5.0f, bounds.max.z - bounds.min.z, 1e-3f, "profundidade (5,0)")
+        assertEquals(4.5f, bounds.max.y, 1e-2f, "o telhado está no topo do Y (+4,5)")
+        assertEquals(0f, bounds.min.y, 1e-2f, "e o chão da casa é o y = 0 (a casa apoia na origem)")
+        assertEquals(4, prepared.meshCount, "a casa, a porta, o cubo verde do telhado e a face amarela")
     }
 
     @Test
